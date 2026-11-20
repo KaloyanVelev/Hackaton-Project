@@ -33,7 +33,7 @@ export interface TripResult {
 export const tripPrototype = {
   minimumPoints: 2,
   maximumPoints: 25,
-  defaultPoints: 10,
+  defaultPoints: 2,
   radiusKm: 30,
   hourWindow: 2,
   monthWindow: 1,
