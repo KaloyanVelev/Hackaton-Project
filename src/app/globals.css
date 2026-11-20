@@ -676,27 +676,29 @@ a { color: inherit; }
 
 @media (max-width: 850px) {
   .brand img { width: 146px; }
-  .toolbar { gap: 8px; }
+  .toolbar {
+    grid-template-columns: 1fr auto;
+    grid-template-areas: "brand actions" "view basemap";
+    gap: 6px 10px;
+    padding-block: 6px 9px;
+  }
+  .brand { grid-area: brand; }
+  .toolbar-end { grid-area: actions; justify-self: end; gap: 8px; }
+  .view-switch { grid-area: view; justify-self: start; }
+  .basemap-switch { grid-area: basemap; justify-self: end; }
   .segmented button { padding-inline: 10px; }
   .map-intro { width: 300px; }
 }
 
 @media (max-width: 620px) {
   .app-shell { --edge: 12px; }
-  .toolbar {
-    grid-template-columns: 1fr auto;
-    grid-template-areas: "brand actions" "view basemap";
-    gap: 4px 6px;
-    padding-block: 5px 8px;
-  }
-  .brand { grid-area: brand; }
-  .toolbar-end { grid-area: actions; justify-self: end; gap: 6px; }
+  .toolbar-end { gap: 6px; }
   .stats-button-label { display: none; }
   .stats-toggle-button { padding: 0 10px; min-width: 44px; }
   .stats-dropdown-card { width: calc(100vw - 24px); max-width: 320px; right: 0; }
-  .view-switch { grid-area: view; justify-self: start; }
-  .basemap-switch { grid-area: basemap; justify-self: end; }
   .basemap-switch span { display: none; }
+  .basemap-switch button { min-width: 44px; }
+  .segmented button { min-height: 44px; font-size: 12px; gap: 5px; padding-inline: 9px; }
   .basemap-switch button { min-width: 44px; }
   .segmented button { min-height: 44px; font-size: 12px; gap: 5px; padding-inline: 9px; }
   .map-intro { top: 12px; width: 300px; padding: 13px 13px 8px; }

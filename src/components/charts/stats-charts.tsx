@@ -337,7 +337,7 @@ export function StatsCharts({ stats, language }: ChartsProps) {
           <p>{t.chart5Desc}</p>
         </div>
         <div className="chart-canvas-container doughnut-container">
-          <Doughnut data={chart5Data} options={commonOptions} />
+          <Doughnut data={chart5Data} options={{ ...commonOptions, scales: {} }} />
         </div>
       </div>
 
