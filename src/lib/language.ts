@@ -61,6 +61,38 @@ const bg = {
   elevation: "Релеф от Mapzen",
   mapAttribution: "Източник на картата",
   fixMap: "Поправка на картата",
+  stats: "Статистика",
+  seeAll: "Виж пълната статистика →",
+  backToMap: "← Обратно към картата",
+  statSlide: "Статистика",
+  nextStat: "Следваща статистика",
+  prevStat: "Предишна статистика",
+  dashboardTitle: "Аналитичен портал за пътна безопасност",
+  dashboardSubtitle: "Обобщен аналитичен преглед на база 102 103 пътни произшествия в България",
+  kpiTotalCrashes: "Общо регистрирани ПТП",
+  kpiFatalities: "Загинали граждани",
+  kpiInjuries: "Ранени граждани",
+  kpiPeakRiskHour: "Най-рисков час (пик)",
+  kpiDeadliestFactor: "Най-смъртоносен фактор",
+  chart1Title: "Тежест по вид произшествие",
+  chart1Desc: "Сравнение между брой инциденти, загинали и ранени за основните видове ПТП",
+  chart2Title: "Риск по часове от денонощието (0–23 ч.)",
+  chart2Desc: "Пикът на инциденти е в 17:00 ч., докато нощните часове бележат висока смъртност спрямо обема",
+  chart3Title: "Топ 10 области с най-много ПТП",
+  chart3Desc: "Брой катастрофи и фатални случаи по административни области",
+  chart4Title: "Разпределение по дни от седмицата",
+  chart4Desc: "Работни дни срещу уикенд: по-малко инциденти през събота, но най-много загинали",
+  chart5Title: "В населено място спрямо извън града",
+  chart5Desc: "70.7% от инцидентите са в градовете, но извънградските катастрофи са значително по-тежки",
+  chart6Title: "Сезонна и месечна динамика (Ян – Дек)",
+  chart6Desc: "Изразен летен пик през юли и август поради засилен трафик към морето и транзитни коридори",
+  chart7Title: "Опасни пътни характеристики и инфраструктура",
+  chart7Desc: "Произшествия при пешеходни пътеки, стеснени участъци, спирки и зони в ремонт",
+  legendCrashes: "Произшествия",
+  legendDeaths: "Загинали",
+  legendInjuries: "Ранени",
+  urbanPlace: "В населено място",
+  ruralPlace: "Извън населено място",
 };
 
 const en: typeof bg = {
@@ -122,6 +154,38 @@ const en: typeof bg = {
   elevation: "Mapzen elevation",
   mapAttribution: "Map attribution",
   fixMap: "Report a map issue",
+  stats: "Statistics",
+  seeAll: "See full analytics →",
+  backToMap: "← Back to Map",
+  statSlide: "Statistic",
+  nextStat: "Next statistic",
+  prevStat: "Previous statistic",
+  dashboardTitle: "Road Safety Analytics Portal",
+  dashboardSubtitle: "Comprehensive analytical overview based on 102,103 road crashes in Bulgaria",
+  kpiTotalCrashes: "Total Recorded Crashes",
+  kpiFatalities: "Total Fatalities",
+  kpiInjuries: "Total Injuries",
+  kpiPeakRiskHour: "Peak Risk Hour",
+  kpiDeadliestFactor: "Deadliest Crash Factor",
+  chart1Title: "Severity & Lethality by Crash Type",
+  chart1Desc: "Comparison of incident volume, fatalities, and injuries across major accident categories",
+  chart2Title: "Hourly Risk Timeline (0:00 – 23:00)",
+  chart2Desc: "Accident volume peaks at 17:00 rush hour, while late night exhibits higher fatality-to-incident ratios",
+  chart3Title: "Top 10 Regions by Incident Volume",
+  chart3Desc: "Accident volume and death toll across Bulgarian administrative provinces",
+  chart4Title: "Day-of-Week Distribution",
+  chart4Desc: "Workdays vs. Weekend: fewer crashes on Saturday, but the highest absolute death toll",
+  chart5Title: "Urban vs. Intercity / Rural Roads",
+  chart5Desc: "70.7% of crashes happen in towns, but rural highway collisions are substantially more lethal",
+  chart6Title: "Seasonal & Monthly Dynamics (Jan – Dec)",
+  chart6Desc: "Distinct summer peaks in July and August driven by holiday and coastal transit traffic",
+  chart7Title: "Hazardous Infrastructure & Road Features",
+  chart7Desc: "Accidents at crosswalks, road narrowing bottlenecks, transit stops, and work zones",
+  legendCrashes: "Crashes",
+  legendDeaths: "Deaths",
+  legendInjuries: "Injuries",
+  urbanPlace: "In urban areas",
+  ruralPlace: "Outside urban areas",
 };
 
 export const copy = { bg, en };
@@ -184,3 +248,14 @@ export function crashPlace(crash: Crash) {
   const parts = [crash.location, crash.municipality, crash.region].filter((part) => part !== null);
   return [...new Set(parts)].join(", ");
 }
+
+export const dayNames: Record<Language, string[]> = {
+  bg: ["Понеделник", "Вторник", "Сряда", "Четвъртък", "Петък", "Събота", "Неделя"],
+  en: ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
+};
+
+export const monthNames: Record<Language, string[]> = {
+  bg: ["Ян", "Фев", "Мар", "Апр", "Май", "Юни", "Юли", "Авг", "Сеп", "Окт", "Ное", "Дек"],
+  en: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
+};
+
