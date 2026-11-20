@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { ArrowRight, BarChart3, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus, Route } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
+import { useLanguage } from "@/lib/use-language";
 import type { Basemap, CrashView, Imagery } from "@/lib/map-style";
 import type { TripResult } from "@/lib/trip";
 import { tripCopy } from "@/lib/trip-copy";
@@ -101,7 +102,7 @@ function Legend({ view, language, listEnabled, onList }: {
 }
 
 export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string | null; streetsStyle: string }) {
-  const [language, setLanguage] = useState<Language>("bg");
+  const [language, setLanguage] = useLanguage();
   const [basemap, setBasemap] = useState<Basemap>("streets");
   const [view, setView] = useState<CrashView>("hotspots");
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
@@ -117,6 +118,9 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   const [tripOpen, setTripOpen] = useState(false);
   const [trip, setTrip] = useState<TripResult | null>(null);
   const [showStats, setShowStats] = useState(false);
+  const statsBoundary = useRef<HTMLDivElement>(null);
+  const statsTrigger = useRef<HTMLButtonElement>(null);
+  const closeStats = useCallback(() => setShowStats(false), []);
   const offline = useSyncExternalStore(subscribeToConnection, isOffline, serverIsOffline);
   const opener = useRef<HTMLElement | null>(null);
   const tripButton = useRef<HTMLButtonElement>(null);
@@ -255,13 +259,14 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
             <Mountain size={17} aria-hidden="true" /><span>{t.satellite}</span>
           </button>
         </div>
-        <div className="toolbar-end">
+        <div className="toolbar-end" ref={statsBoundary}>
           <button type="button" className="language-button" aria-label={t.language}
             onClick={() => setLanguage(language === "bg" ? "en" : "bg")}>
             <Globe2 size={17} aria-hidden="true" />{language === "bg" ? "EN" : "BG"}
           </button>
-          <button type="button" className={`stats-toggle-button ${showStats ? "active" : ""}`}
+          <button ref={statsTrigger} type="button" className={`stats-toggle-button ${showStats ? "active" : ""}`}
             aria-label={t.stats} title={t.stats} aria-expanded={showStats}
+            aria-controls={showStats ? "stats-dropdown" : undefined}
             onClick={() => setShowStats((prev) => !prev)}>
             <BarChart3 size={17} aria-hidden="true" />
             <span className="stats-button-label">{t.stats}</span>
@@ -270,7 +275,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
             <StatsDropdown
               language={language}
               snapshotId={snapshot?.id ?? null}
-              onClose={() => setShowStats(false)}
+              boundaryRef={statsBoundary} triggerRef={statsTrigger} onClose={closeStats}
             />
           )}
         </div>

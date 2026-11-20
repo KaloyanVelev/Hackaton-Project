@@ -16,7 +16,7 @@ import {
   type ChartOptions,
 } from "chart.js";
 import { Bar, Line, Doughnut, Radar } from "react-chartjs-2";
-import type { AggregatedStats } from "@/lib/crashes";
+import { crashLocationCounts, type AggregatedStats } from "@/lib/crashes";
 import { copy, type Language, dayNames, monthNames, crashType, count } from "@/lib/language";
 
 ChartJS.register(
@@ -190,7 +190,7 @@ export function StatsCharts({ stats, language }: ChartsProps) {
 
   // 4. Day of Week
   const chart4Data = {
-    labels: dayNames[language],
+    labels: stats.dayOfWeek.map(({ day }) => dayNames[language][day - 1]),
     datasets: [
       {
         label: t.legendCrashes,
@@ -226,11 +226,12 @@ export function StatsCharts({ stats, language }: ChartsProps) {
   };
 
   // 5. Urban vs Rural
+  const { urban, rural } = crashLocationCounts(stats.urbanRural);
   const chart5Data = {
     labels: [t.urbanPlace, t.ruralPlace],
     datasets: [
       {
-        data: stats.urbanRural.slice(0, 2).map((u) => u.count),
+        data: [urban, rural],
         backgroundColor: ["#3b82f6", "#f97316"],
         borderColor: "rgba(15, 23, 42, 0.8)",
         borderWidth: 2,
@@ -240,7 +241,7 @@ export function StatsCharts({ stats, language }: ChartsProps) {
 
   // 6. Monthly / Seasonal Curve
   const chart6Data = {
-    labels: monthNames[language],
+    labels: stats.monthly.map(({ month }) => monthNames[language][month - 1]),
     datasets: [
       {
         label: t.legendCrashes,

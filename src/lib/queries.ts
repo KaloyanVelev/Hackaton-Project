@@ -20,6 +20,11 @@ export async function getCurrentSnapshot() {
   return rows[0] ?? null;
 }
 
+export async function hasSnapshot(id: string) {
+  const { rows } = await database().query("SELECT 1 FROM crash_snapshots WHERE id = $1", [id]);
+  return rows.length > 0;
+}
+
 export async function getPointFeed(snapshotId: string) {
   const { rows } = await database().query<{ points_gzip: Buffer }>(
     "SELECT points_gzip FROM crash_snapshots WHERE id = $1",
@@ -80,7 +85,7 @@ export async function getAggregatedStats(snapshotId: string): Promise<Aggregated
              coalesce(sum(deaths), 0)::int AS deaths,
              coalesce(sum(injured), 0)::int AS injured
       FROM crashes
-      WHERE snapshot_id = $1 AND raw->>'hourofday' ~ '^[0-9]+$'
+      WHERE snapshot_id = $1 AND raw->>'hourofday' ~ '^([01]?[0-9]|2[0-3])$'
       GROUP BY 1 ORDER BY 1`, [snapshotId]),
     db.query<{ type: string; count: number; deaths: number; injured: number }>(`
       SELECT crash_type AS type,
@@ -120,7 +125,7 @@ export async function getAggregatedStats(snapshotId: string): Promise<Aggregated
              coalesce(sum(deaths), 0)::int AS deaths,
              coalesce(sum(injured), 0)::int AS injured
       FROM crashes
-      WHERE snapshot_id = $1 AND raw->>'month' ~ '^[0-9]+$'
+      WHERE snapshot_id = $1 AND raw->>'month' ~ '^(0?[1-9]|1[0-2])$'
       GROUP BY 1 ORDER BY 1`, [snapshotId]),
     db.query<{ feature: string; count: number; deaths: number; injured: number }>(`
       SELECT raw->>'ptp_placecharacteristics' AS feature,

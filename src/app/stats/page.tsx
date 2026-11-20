@@ -3,16 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Globe2, ShieldAlert, Users, Skull, Activity, AlertCircle } from "lucide-react";
-import type { AggregatedStats } from "@/lib/crashes";
-import { copy, count, type Language } from "@/lib/language";
+import { formatStatsSummary, validateStatsPayload, type AggregatedStats } from "@/lib/crashes";
+import { copy, count } from "@/lib/language";
+import { useLanguage } from "@/lib/use-language";
 import { StatsCharts } from "@/components/charts/stats-charts";
 
 export default function StatsPage() {
-  const [language, setLanguage] = useState<Language>("bg");
+  const [language, setLanguage] = useLanguage();
   const [stats, setStats] = useState<AggregatedStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState(false);
   const t = copy[language];
+  const peakHour = stats && formatStatsSummary(stats).peakHour;
 
   useEffect(() => {
     document.title = `Street Aware | ${t.dashboardTitle}`;
@@ -24,15 +26,16 @@ export default function StatsPage() {
     async function fetchStats() {
       try {
         setLoading(true);
-        setError(null);
+        setError(false);
         const res = await fetch("/api/stats");
         if (!res.ok) throw new Error("Could not load statistics.");
-        const data = await res.json() as { stats: AggregatedStats };
+        const data = await res.json();
+        if (!validateStatsPayload(data.stats)) throw new Error("Invalid statistics.");
         if (!ignore) {
           setStats(data.stats);
         }
-      } catch (err: any) {
-        if (!ignore) setError(err.message || "Failed to load data");
+      } catch {
+        if (!ignore) setError(true);
       } finally {
         if (!ignore) setLoading(false);
       }
@@ -86,7 +89,7 @@ export default function StatsPage() {
         {error && (
           <div className="stats-error-banner" role="alert">
             <AlertCircle size={20} />
-            <p>{error}</p>
+            <p>{t.statsError}</p>
             <button type="button" onClick={() => window.location.reload()} className="action-button">
               {t.retry}
             </button>
@@ -132,8 +135,8 @@ export default function StatsPage() {
                   <ShieldAlert size={20} />
                 </div>
                 <div className="kpi-meta">
-                  <span className="kpi-label">{t.kpiPeakRiskHour}</span>
-                  <span className="kpi-value">17:00 ч.</span>
+                  <span className="kpi-label">{t.kpiPeakCrashHour}</span>
+                  <span className="kpi-value">{peakHour ? `${String(peakHour.hour).padStart(2, "0")}:00` : "—"}</span>
                 </div>
               </div>
             </div>

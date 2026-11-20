@@ -1,323 +1,163 @@
 "use client";
 
-import { useEffect, useState, useRef, useCallback } from "react";
+import { useCallback, useEffect, useState, type RefObject } from "react";
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, X, ExternalLink, TrendingUp, AlertTriangle, Clock, MapPin, Calendar, Compass, ShieldAlert } from "lucide-react";
-import type { AggregatedStats } from "@/lib/crashes";
-import { copy, count, type Language, dayNames, monthNames, crashType } from "@/lib/language";
+import { AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock, Compass, ExternalLink, MapPin, ShieldAlert, TrendingUp, X } from "lucide-react";
+import { crashLocationCounts, formatStatsSummary, validateStatsPayload, type AggregatedStats } from "@/lib/crashes";
+import { copy, count, crashType, dayNames, monthNames, type Language } from "@/lib/language";
 
-interface StatsDropdownProps {
-  language: Language;
-  snapshotId: string | null;
-  onClose: () => void;
+const totalCards = 7;
+
+function Statistic({ stats, index, language }: { stats: AggregatedStats; index: number; language: Language }) {
+  const t = copy[language];
+  const { peakHour: hour, topCrashType: type, topRegion: region, deadliestDay: day, peakMonth: month, topFeature: feature } =
+    formatStatsSummary(stats);
+  const { urban, rural } = crashLocationCounts(stats.urbanRural);
+  const placeTotal = urban + rural;
+  const number = (value: number) => count(language, value);
+  const crashes = (value: number) => `${t.legendCrashes} · ${number(value)}`;
+  const deaths = (value: number) => `${t.legendDeaths} · ${number(value)}`;
+  const cards = [
+    { title: t.chart2Title, icon: Clock, value: hour && `${String(hour.hour).padStart(2, "0")}:00`,
+      label: t.kpiPeakCrashHour, detail: hour && `${crashes(hour.count)} / ${deaths(hour.deaths)}` },
+    { title: t.chart1Title, icon: AlertTriangle, value: type && number(type.count),
+      label: t.legendCrashes, detail: type && crashType(language, type.type) },
+    { title: t.chart3Title, icon: MapPin, value: region && number(region.count),
+      label: t.legendCrashes, detail: region && `${region.region} · ${deaths(region.deaths)}` },
+    { title: t.chart4Title, icon: Calendar, value: day && number(day.deaths),
+      label: t.legendDeaths, detail: day && dayNames[language][day.day - 1] },
+    { title: t.chart5Title, icon: Compass,
+      value: placeTotal ? new Intl.NumberFormat(language, { style: "percent", maximumFractionDigits: 1 }).format(urban / placeTotal) : null,
+      label: t.urbanPlace, detail: `${t.urbanPlace} · ${number(urban)} / ${t.ruralPlace} · ${number(rural)}` },
+    { title: t.chart6Title, icon: TrendingUp, value: month && number(month.count),
+      label: t.legendCrashes, detail: month && `${monthNames[language][month.month - 1]} · ${deaths(month.deaths)}` },
+    { title: t.chart7Title, icon: ShieldAlert, value: feature && number(feature.count),
+      label: t.legendCrashes, detail: feature && feature.feature },
+  ];
+  const { title, icon: Icon, value, label, detail } = cards[index];
+
+  return (
+    <div className="stat-card-body">
+      <div className="stat-badge"><Icon size={14} aria-hidden="true" />{title}</div>
+      {value === null ? <p className="stat-summary-text">{t.noStats}</p> : (
+        <>
+          <div className="stat-hero-number">{value}<span className="stat-hero-label">{label}</span></div>
+          {detail && <p className="stat-summary-text">{detail}</p>}
+          {index === 0 && hour && (
+            <div className="mini-bars" aria-hidden="true">
+              {stats.hourly.map(({ hour: bucket, count }) => (
+                <div key={bucket} className={`mini-bar${bucket === hour.hour ? " highlight" : ""}`}
+                  style={{ height: `${Math.max(12, count / Math.max(hour.count, 1) * 100)}%` }} />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
 }
 
-export function StatsDropdown({ language, snapshotId, onClose }: StatsDropdownProps) {
+export function StatsDropdown({ language, snapshotId, boundaryRef, triggerRef, onClose }: {
+  language: Language;
+  snapshotId: string | null;
+  boundaryRef: RefObject<HTMLDivElement | null>;
+  triggerRef: RefObject<HTMLButtonElement | null>;
+  onClose: () => void;
+}) {
   const [stats, setStats] = useState<AggregatedStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
   const t = copy[language];
 
-  // Fetch stats from API
   useEffect(() => {
-    let ignore = false;
+    const controller = new AbortController();
     async function loadStats() {
+      setLoading(true);
+      setError(false);
+      setStats(null);
       try {
-        setLoading(true);
         const url = snapshotId ? `/api/stats?snapshot=${snapshotId}` : "/api/stats";
-        const res = await fetch(url);
-        if (!res.ok) throw new Error("Failed to load statistics");
-        const data = await res.json() as { stats: AggregatedStats };
-        if (!ignore) {
-          setStats(data.stats);
-        }
-      } catch (err) {
-        console.error("Failed to load stats:", err);
+        const res = await fetch(url, { signal: controller.signal });
+        if (!res.ok) throw new Error("Failed to load statistics.");
+        const { stats } = await res.json();
+        if (!validateStatsPayload(stats)) throw new Error("Invalid statistics.");
+        if (!controller.signal.aborted) setStats(stats);
+      } catch {
+        if (!controller.signal.aborted) setError(true);
       } finally {
-        if (!ignore) setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     void loadStats();
-    return () => { ignore = true; };
+    return () => controller.abort();
   }, [snapshotId]);
 
-  // Click outside to close
+  const closeAndFocus = useCallback(() => {
+    onClose();
+    triggerRef.current?.focus();
+  }, [onClose, triggerRef]);
+
   useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (cardRef.current && !cardRef.current.contains(event.target as Node)) {
-        onClose();
-      }
+    function handleOutside(event: PointerEvent) {
+      if (event.target instanceof Node && !boundaryRef.current?.contains(event.target)) onClose();
     }
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [onClose]);
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") closeAndFocus();
+    }
+    document.addEventListener("pointerdown", handleOutside);
+    window.addEventListener("keydown", handleEscape);
+    return () => {
+      document.removeEventListener("pointerdown", handleOutside);
+      window.removeEventListener("keydown", handleEscape);
+    };
+  }, [boundaryRef, closeAndFocus, onClose]);
 
-  // ESC to close
+  const next = useCallback(() => setActiveIndex((prev) => (prev + 1) % totalCards), []);
+  const previous = () => setActiveIndex((prev) => (prev - 1 + totalCards) % totalCards);
+
   useEffect(() => {
-    function handleKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
-
-  const totalCards = 7;
-
-  const nextCard = useCallback(() => {
-    setActiveIndex((prev) => (prev + 1) % totalCards);
-  }, [totalCards]);
-
-  const prevCard = useCallback(() => {
-    setActiveIndex((prev) => (prev - 1 + totalCards) % totalCards);
-  }, [totalCards]);
-
-  // Auto-rotate every 5s unless hovered/paused
-  useEffect(() => {
-    if (isPaused || loading || !stats) return;
-    const timer = setInterval(nextCard, 5000);
-    return () => clearInterval(timer);
-  }, [isPaused, loading, stats, nextCard]);
-
-  // Slide content generator
-  function renderSlideContent(index: number) {
-    if (!stats) return null;
-
-    switch (index) {
-      case 0: {
-        // Hourly risk
-        const peak = [...stats.hourly].sort((a, b) => b.count - a.count)[0];
-        const nightFatalRatio = stats.hourly.find((h) => h.hour === 3);
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><Clock size={14} /> {t.chart2Title}</div>
-            <div className="stat-hero-number">
-              {peak ? `${peak.hour}:00` : "17:00"}
-              <span className="stat-hero-label">{t.kpiPeakRiskHour}</span>
-            </div>
-            <p className="stat-summary-text">
-              {peak ? count(language, peak.count) : "7,413"} {t.crashes.toLowerCase()} ({peak ? count(language, peak.deaths) : "101"} {t.deaths.toLowerCase()}).
-              {language === "bg" ? " Нощните часове (02:00–04:00) носят най-висока смъртност на инцидент." : " Night hours (02:00–04:00) show highest lethality per crash."}
-            </p>
-            {/* Mini sparkline */}
-            <div className="mini-bars" aria-hidden="true">
-              {stats.hourly.map((h) => {
-                const max = Math.max(...stats.hourly.map((x) => x.count), 1);
-                const heightPercent = Math.round((h.count / max) * 100);
-                const isPeak = h.hour === peak?.hour;
-                return (
-                  <div
-                    key={h.hour}
-                    className={`mini-bar ${isPeak ? "highlight" : ""}`}
-                    style={{ height: `${Math.max(heightPercent, 12)}%` }}
-                    title={`${h.hour}:00 - ${h.count} crashes`}
-                  />
-                );
-              })}
-            </div>
-          </div>
-        );
-      }
-      case 1: {
-        // Crash type & severity
-        const topType = stats.crashTypes[0];
-        const pedestrian = stats.crashTypes.find((c) => c.type.includes("пешеходец"));
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><AlertTriangle size={14} /> {t.chart1Title}</div>
-            <div className="stat-hero-number">
-              {pedestrian ? count(language, pedestrian.deaths) : "240"}
-              <span className="stat-hero-label">{language === "bg" ? "Загинали пешеходци" : "Pedestrian Fatalities"}</span>
-            </div>
-            <p className="stat-summary-text">
-              {pedestrian ? `${crashType(language, pedestrian.type)}: ${count(language, pedestrian.count)} инцидента, но най-много смъртни случаи.` : ""}
-              <br />
-              <small>{language === "bg" ? "Най-често ПТП:" : "Most frequent:"} {topType ? crashType(language, topType.type) : ""}</small>
-            </p>
-          </div>
-        );
-      }
-      case 2: {
-        // Regions
-        const sofia = stats.regions.find((r) => r.region?.includes("СОФИЯ"));
-        const plovdiv = stats.regions.find((r) => r.region?.includes("ПЛОВДИВ"));
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><MapPin size={14} /> {t.chart3Title}</div>
-            <div className="stat-hero-number">
-              {sofia ? count(language, sofia.count) : "27,549"}
-              <span className="stat-hero-label">{language === "bg" ? "ПТП в София (№1 по обем)" : "Crashes in Sofia (#1 Volume)"}</span>
-            </div>
-            <p className="stat-summary-text">
-              {language === "bg"
-                ? `В Пловдив има най-много загинали (${plovdiv ? count(language, plovdiv.deaths) : "145"}), въпреки трикратно по-малко инциденти.`
-                : `Plovdiv recorded the highest fatalities (${plovdiv ? count(language, plovdiv.deaths) : "145"}), despite 3x fewer total crashes.`}
-            </p>
-          </div>
-        );
-      }
-      case 3: {
-        // Weekday vs weekend
-        const sat = stats.dayOfWeek.find((d) => d.day === 6);
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><Calendar size={14} /> {t.chart4Title}</div>
-            <div className="stat-hero-number">
-              {sat ? count(language, sat.deaths) : "239"}
-              <span className="stat-hero-label">{language === "bg" ? "Загинали в събота" : "Saturday Deaths"}</span>
-            </div>
-            <p className="stat-summary-text">
-              {language === "bg"
-                ? "В събота има по-малко ПТП спрямо работните дни, но най-висок брой фатални изходи."
-                : "Saturday has fewer total accidents than weekdays, but peak mortality."}
-            </p>
-          </div>
-        );
-      }
-      case 4: {
-        // Urban vs Rural
-        const urban = stats.urbanRural.find((u) => u.place.includes("в населено"));
-        const rural = stats.urbanRural.find((u) => u.place.includes("извън"));
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><Compass size={14} /> {t.chart5Title}</div>
-            <div className="stat-hero-number">
-              70.7%
-              <span className="stat-hero-label">{t.urbanPlace}</span>
-            </div>
-            <p className="stat-summary-text">
-              {urban ? `${count(language, urban.count)} в града` : ""} vs{" "}
-              {rural ? `${count(language, rural.count)} извън града` : ""}.
-              {language === "bg"
-                ? " Извънградските инциденти са значително по-тежки поради по-високата скорост."
-                : " Rural crashes carry far higher fatality severity due to highway speed."}
-            </p>
-          </div>
-        );
-      }
-      case 5: {
-        // Monthly
-        const summerPeak = stats.monthly.find((m) => m.month === 7);
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><TrendingUp size={14} /> {t.chart6Title}</div>
-            <div className="stat-hero-number">
-              {summerPeak ? count(language, summerPeak.count) : "9,742"}
-              <span className="stat-hero-label">{language === "bg" ? "ПТП през Юли (Летен пик)" : "Crashes in July (Summer Peak)"}</span>
-            </div>
-            <p className="stat-summary-text">
-              {language === "bg"
-                ? "Юли и Август бележат пик на пътуванията към морето и международен транзит с над 150 загинали/месец."
-                : "July and August experience summer vacation surges with over 150 fatalities per month."}
-            </p>
-          </div>
-        );
-      }
-      case 6: {
-        // Infrastructure
-        const topFeature = stats.roadFeatures[0];
-        return (
-          <div className="stat-card-body">
-            <div className="stat-badge"><ShieldAlert size={14} /> {t.chart7Title}</div>
-            <div className="stat-hero-number">
-              {topFeature ? count(language, topFeature.count) : "2,383"}
-              <span className="stat-hero-label">{language === "bg" ? "На пешеходна пътека" : "At Crosswalks"}</span>
-            </div>
-            <p className="stat-summary-text">
-              {language === "bg"
-                ? "Очертаните пешеходни пътеки и стеснените участъци са сред най-честите инфраструктурни рискови фактори."
-                : "Marked crosswalks and narrowed road sections represent the most frequent infrastructure risks."}
-            </p>
-          </div>
-        );
-      }
-      default:
-        return null;
-    }
-  }
+    if (isPaused || loading || !stats || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(next, 5000);
+    return () => window.clearInterval(timer);
+  }, [isPaused, loading, stats, next]);
 
   return (
-    <div
-      ref={cardRef}
-      className="stats-dropdown-card"
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
-      role="dialog"
-      aria-label={t.stats}
-    >
+    <div id="stats-dropdown" className="stats-dropdown-card" role="dialog" aria-label={t.stats}
+      onMouseEnter={() => setIsPaused(true)} onMouseLeave={() => setIsPaused(false)}>
       <div className="stats-dropdown-header">
         <div className="stats-dropdown-title">
-          <TrendingUp size={16} className="stat-icon-brand" />
+          <TrendingUp size={16} className="stat-icon-brand" aria-hidden="true" />
           <span>{t.stats}</span>
-          <span className="stat-carousel-indicator">
-            {activeIndex + 1} / {totalCards}
-          </span>
+          <span className="stat-carousel-indicator">{activeIndex + 1} / {totalCards}</span>
         </div>
-        <button
-          type="button"
-          className="stats-close-btn"
-          onClick={onClose}
-          aria-label={t.close}
-          title={t.close}
-        >
-          <X size={15} />
+        <button type="button" className="stats-close-btn" onClick={closeAndFocus} aria-label={t.close}>
+          <X size={15} aria-hidden="true" />
         </button>
       </div>
-
       <div className="stats-carousel-viewport">
-        {loading ? (
-          <div className="stats-loading-box">
-            <div className="spinner" />
-            <span>{t.loading}</span>
-          </div>
-        ) : (
-          renderSlideContent(activeIndex)
-        )}
+        {loading && <div className="stats-loading-box" role="status"><div className="spinner" /><span>{t.loading}</span></div>}
+        {error && <p className="stat-summary-text" role="alert">{t.statsError}</p>}
+        {stats && <Statistic key={activeIndex} stats={stats} index={activeIndex} language={language} />}
       </div>
-
-      {/* Rotation navigation & dots */}
       <div className="stats-carousel-nav">
-        <button
-          type="button"
-          className="carousel-arrow-btn"
-          onClick={prevCard}
-          aria-label={t.prevStat}
-          title={t.prevStat}
-        >
-          <ChevronLeft size={16} />
+        <button type="button" className="carousel-arrow-btn" onClick={previous} aria-label={t.prevStat}>
+          <ChevronLeft size={16} aria-hidden="true" />
         </button>
-
-        <div className="carousel-dots" role="tablist">
-          {Array.from({ length: totalCards }).map((_, i) => (
-            <button
-              key={i}
-              type="button"
-              role="tab"
-              aria-selected={i === activeIndex}
-              aria-label={`${t.statSlide} ${i + 1}`}
-              className={`carousel-dot ${i === activeIndex ? "active" : ""}`}
-              onClick={() => setActiveIndex(i)}
-            />
+        <div className="carousel-dots" role="group" aria-label={t.stats}>
+          {Array.from({ length: totalCards }, (_, i) => (
+            <button key={i} type="button" aria-pressed={i === activeIndex} aria-label={`${t.statSlide} ${i + 1}`}
+              className={`carousel-dot${i === activeIndex ? " active" : ""}`} onClick={() => setActiveIndex(i)} />
           ))}
         </div>
-
-        <button
-          type="button"
-          className="carousel-arrow-btn"
-          onClick={nextCard}
-          aria-label={t.nextStat}
-          title={t.nextStat}
-        >
-          <ChevronRight size={16} />
+        <button type="button" className="carousel-arrow-btn" onClick={next} aria-label={t.nextStat}>
+          <ChevronRight size={16} aria-hidden="true" />
         </button>
       </div>
-
-      {/* Link to /stats */}
       <div className="stats-dropdown-footer">
         <Link href="/stats" className="see-all-stats-btn" onClick={onClose}>
-          <span>{t.seeAll}</span>
-          <ExternalLink size={14} />
+          <span>{t.seeAll}</span><ExternalLink size={14} aria-hidden="true" />
         </Link>
       </div>
     </div>

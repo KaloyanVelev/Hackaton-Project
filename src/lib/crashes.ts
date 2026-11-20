@@ -102,23 +102,26 @@ export function validateStatsPayload(data: unknown): data is AggregatedStats {
 }
 
 export function formatStatsSummary(stats: AggregatedStats) {
-  const peakHourItem = [...stats.hourly].sort((a, b) => b.count - a.count)[0];
-  const deadliestTypeItem = [...stats.crashTypes].sort((a, b) => b.deaths - a.deaths)[0];
-  const deadliestRegionItem = [...stats.regions].sort((a, b) => b.deaths - a.deaths)[0];
-  const deadliestDayItem = [...stats.dayOfWeek].sort((a, b) => b.deaths - a.deaths)[0];
-  const peakMonthItem = [...stats.monthly].sort((a, b) => b.count - a.count)[0];
-  const topFeatureItem = [...stats.roadFeatures].sort((a, b) => b.count - a.count)[0];
-
+  const highest = <T extends MetricCount>(rows: T[], field: "count" | "deaths" = "count") =>
+    rows.reduce<T | null>((best, row) => !best || row[field] > best[field] ? row : best, null);
   return {
-    peakHour: peakHourItem ? peakHourItem.hour : 17,
-    deadliestCrashType: deadliestTypeItem ? deadliestTypeItem.type : "блъскане на пешеходец",
-    deadliestRegion: deadliestRegionItem ? deadliestRegionItem.region : "ПЛОВДИВ",
-    deadliestDay: deadliestDayItem ? deadliestDayItem.day : 6,
-    peakMonth: peakMonthItem ? peakMonthItem.month : 7,
-    topFeature: topFeatureItem ? topFeatureItem.feature : "пешеходна пътека",
+    peakHour: highest(stats.hourly),
+    topCrashType: highest(stats.crashTypes),
+    topRegion: highest(stats.regions),
+    deadliestDay: highest(stats.dayOfWeek, "deaths"),
+    peakMonth: highest(stats.monthly),
+    topFeature: highest(stats.roadFeatures),
   };
 }
 
+export function crashLocationCounts(rows: UrbanRuralStat[]) {
+  const countFor = (place: string) =>
+    rows.reduce((total, row) => row.place.trim().toLowerCase() === place ? total + row.count : total, 0);
+  return {
+    urban: countFor("в населено място"),
+    rural: countFor("извън населено място"),
+  };
+}
 
 export type CrashPoints = FeatureCollection<Point, { severity: Severity; crashId: number }>;
 

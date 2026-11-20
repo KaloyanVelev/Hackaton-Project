@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import type { AggregatedStats } from "../src/lib/crashes.ts";
-import { formatStatsSummary, validateStatsPayload } from "../src/lib/crashes.ts";
+import { crashLocationCounts, formatStatsSummary, validateStatsPayload } from "../src/lib/crashes.ts";
 
 test("validateStatsPayload validates complete stats payload structure", () => {
   const sample: AggregatedStats = {
@@ -57,10 +57,24 @@ test("formatStatsSummary produces correct highlights for quick carousel cards", 
   };
 
   const highlights = formatStatsSummary(sample);
-  assert.equal(highlights.peakHour, 17);
-  assert.equal(highlights.deadliestCrashType, "блъскане на пешеходец");
-  assert.equal(highlights.deadliestRegion, "ПЛОВДИВ");
-  assert.equal(highlights.deadliestDay, 6);
-  assert.equal(highlights.peakMonth, 7);
-  assert.equal(highlights.topFeature, "пешеходна пътека очертана с пътна маркировка");
+  assert.equal(highlights.peakHour?.hour, 17);
+  assert.equal(highlights.topCrashType?.type, "сблъскване между МПС странично");
+  assert.equal(highlights.topRegion?.region, "СОФИЯ");
+  assert.equal(highlights.deadliestDay?.day, 6);
+  assert.equal(highlights.peakMonth?.month, 7);
+  assert.equal(highlights.topFeature?.feature, "пешеходна пътека очертана с пътна маркировка");
+
+  sample.hourly = [{ hour: 4, count: 9, deaths: 1, injured: 2 }];
+  sample.monthly = [];
+  assert.equal(formatStatsSummary(sample).peakHour?.hour, 4);
+  assert.equal(formatStatsSummary(sample).peakMonth, null);
+});
+
+test("location counts keep urban and rural categories separate regardless of order", () => {
+  const row = { deaths: 0, injured: 0 };
+  assert.deepEqual(crashLocationCounts([
+    { place: "извън населено място", count: 8, ...row },
+    { place: "неуточнено", count: 5, ...row },
+    { place: "В населено място", count: 3, ...row },
+  ]), { urban: 3, rural: 8 });
 });
