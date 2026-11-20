@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowRight, BarChart3, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus, Route } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Github, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus, Route } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
 import { useLanguage } from "@/lib/use-language";
@@ -49,7 +49,10 @@ function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery
           </a>
         )}
       </div>
-      <a className="map-repo-link" href={repositoryUrl} target="_blank" rel="noreferrer">Check our repo</a>
+      <a className="map-repo-link" href={repositoryUrl} target="_blank" rel="noreferrer">
+        <Github size={15} aria-hidden="true" />
+        Check our repo
+      </a>
       <div className="map-credits"
         onPointerEnter={(event) => { if (event.pointerType === "mouse") setHovered(true); }}
         onPointerLeave={(event) => { if (event.pointerType === "mouse") setHovered(false); }}

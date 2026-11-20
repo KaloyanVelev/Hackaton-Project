@@ -597,7 +597,22 @@ a { color: inherit; }
 .map-footer a { text-decoration-color: var(--line); text-underline-offset: 2px; }
 .map-footer a:hover { color: var(--text); text-decoration-color: currentColor; }
 .map-footer-brand { justify-self: start; }
-.map-repo-link { padding-block: 5px; }
+.map-repo-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-block: 4px;
+  min-height: 30px;
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--control);
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 650;
+  text-decoration: none;
+}
+.map-repo-link:hover { background: var(--hover); }
 .map-credits { position: relative; justify-self: end; max-width: 100%; }
 .map-credits-trigger {
   display: flex;
