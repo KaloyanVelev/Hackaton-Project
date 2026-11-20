@@ -223,13 +223,14 @@ function connectMap(
           [180, 90, -180, -90],
         );
         const width = container.clientWidth;
+        const height = container.clientHeight;
         const narrow = width < 621;
         map.fitBounds([[left, bottom], [right, top]], {
           padding: {
-            top: narrow ? 45 : 65,
+            top: narrow ? 20 : 65,
             left: width >= 1180 ? 402 : 34,
-            right: narrow ? 34 : Math.min(414, Math.round(width * 0.47)),
-            bottom: narrow ? Math.min(310, Math.round(container.clientHeight * 0.56)) : 60,
+            right: narrow ? 34 : Math.min(462, Math.round(width * 0.68)),
+            bottom: narrow ? Math.min(Math.round(height * 0.72) + 10, height - 64) : 60,
           },
           maxZoom: 13,
           duration: prefersStill() ? 0 : 550,

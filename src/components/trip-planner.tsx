@@ -49,7 +49,13 @@ export function TripPlanner({ language, result, onResult, onClose }: {
   }, []);
 
   useEffect(() => {
-    if (result) resultsHeading.current?.focus();
+    if (!result || !resultsHeading.current) return;
+    if (window.matchMedia("(max-width: 620px)").matches) {
+      resultsHeading.current.focus({ preventScroll: true });
+      resultsHeading.current.scrollIntoView({ block: "start" });
+    } else {
+      resultsHeading.current.focus();
+    }
   }, [result]);
 
   function changeField<T>(setValue: (value: T) => void, value: T) {
