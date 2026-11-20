@@ -14,3 +14,7 @@ test-results/
 /data/*
 !/data/street-aware.dump
 /public/maps/maplibre-gl-worker.mjs
+.worktrees/
+.worktrees
+
+

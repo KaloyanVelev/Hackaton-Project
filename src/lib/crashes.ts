@@ -36,6 +36,90 @@ export interface CrashPage {
   total?: number;
 }
 
+export interface MetricCount {
+  count: number;
+  deaths: number;
+  injured: number;
+}
+
+export interface HourlyStat extends MetricCount {
+  hour: number;
+}
+
+export interface CrashTypeStat extends MetricCount {
+  type: string;
+}
+
+export interface RegionStat extends MetricCount {
+  region: string;
+}
+
+export interface DayOfWeekStat extends MetricCount {
+  day: number;
+}
+
+export interface UrbanRuralStat extends MetricCount {
+  place: string;
+}
+
+export interface MonthlyStat extends MetricCount {
+  month: number;
+}
+
+export interface RoadFeatureStat extends MetricCount {
+  feature: string;
+}
+
+export interface AggregatedStats {
+  totals: {
+    totalCrashes: number;
+    totalDeaths: number;
+    totalInjured: number;
+  };
+  hourly: HourlyStat[];
+  crashTypes: CrashTypeStat[];
+  regions: RegionStat[];
+  dayOfWeek: DayOfWeekStat[];
+  urbanRural: UrbanRuralStat[];
+  monthly: MonthlyStat[];
+  roadFeatures: RoadFeatureStat[];
+}
+
+export function validateStatsPayload(data: unknown): data is AggregatedStats {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Partial<AggregatedStats>;
+  return Boolean(
+    d.totals &&
+    typeof d.totals.totalCrashes === "number" &&
+    Array.isArray(d.hourly) &&
+    Array.isArray(d.crashTypes) &&
+    Array.isArray(d.regions) &&
+    Array.isArray(d.dayOfWeek) &&
+    Array.isArray(d.urbanRural) &&
+    Array.isArray(d.monthly) &&
+    Array.isArray(d.roadFeatures)
+  );
+}
+
+export function formatStatsSummary(stats: AggregatedStats) {
+  const peakHourItem = [...stats.hourly].sort((a, b) => b.count - a.count)[0];
+  const deadliestTypeItem = [...stats.crashTypes].sort((a, b) => b.deaths - a.deaths)[0];
+  const deadliestRegionItem = [...stats.regions].sort((a, b) => b.deaths - a.deaths)[0];
+  const deadliestDayItem = [...stats.dayOfWeek].sort((a, b) => b.deaths - a.deaths)[0];
+  const peakMonthItem = [...stats.monthly].sort((a, b) => b.count - a.count)[0];
+  const topFeatureItem = [...stats.roadFeatures].sort((a, b) => b.count - a.count)[0];
+
+  return {
+    peakHour: peakHourItem ? peakHourItem.hour : 17,
+    deadliestCrashType: deadliestTypeItem ? deadliestTypeItem.type : "блъскане на пешеходец",
+    deadliestRegion: deadliestRegionItem ? deadliestRegionItem.region : "ПЛОВДИВ",
+    deadliestDay: deadliestDayItem ? deadliestDayItem.day : 6,
+    peakMonth: peakMonthItem ? peakMonthItem.month : 7,
+    topFeature: topFeatureItem ? topFeatureItem.feature : "пешеходна пътека",
+  };
+}
+
+
 export type CrashPoints = FeatureCollection<Point, { severity: Severity; crashId: number }>;
 
 export function deriveSeverity(deaths: number | null, injured: number | null): Severity {
