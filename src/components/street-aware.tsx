@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
@@ -9,6 +9,18 @@ import { CrashDrawer, SeverityMark, type ListPanel, type Panel } from "./crash-d
 import { MapCanvas, type MapControls, type MapNotice } from "./map-canvas";
 
 const crashDataUrl = "https://testdata.egov.bg/data/view/0c5d9df9-2162-4b32-8c12-862b259efbdc";
+
+function subscribeToConnection(onChange: () => void) {
+  window.addEventListener("online", onChange);
+  window.addEventListener("offline", onChange);
+  return () => {
+    window.removeEventListener("online", onChange);
+    window.removeEventListener("offline", onChange);
+  };
+}
+
+const isOffline = () => !navigator.onLine;
+const serverIsOffline = () => false;
 
 function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery: Imagery | null; language: Language }) {
   const t = copy[language];
@@ -97,6 +109,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   const [pointsReady, setPointsReady] = useState(false);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [selected, setSelected] = useState<Crash | null>(null);
+  const offline = useSyncExternalStore(subscribeToConnection, isOffline, serverIsOffline);
   const opener = useRef<HTMLElement | null>(null);
   const workspace = useRef<HTMLElement>(null);
   const t = copy[language];
@@ -173,7 +186,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
   const unavailableRows = snapshot ? snapshot.sourceCount - snapshot.mappedCount : 0;
   const canList = Boolean(snapshot);
-  const activeNotice = notices.pointsError ? t.pointsError :
+  const activeNotice = offline ? t.offline : notices.pointsError ? t.pointsError :
     basemap === "streets" && notices.streetError ? t.streetError :
       basemap === "satellite" && notices.imageryError ? t.imageryError : null;
 
@@ -248,10 +261,12 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
         {unavailable ? (
           <div className="map-unavailable" role="status">
-            <MapIcon size={24} aria-hidden="true" /><p>{t.noMap}</p>
+            <MapIcon size={24} aria-hidden="true" /><p>{offline ? t.offline : t.noMap}</p>
             {canList && <button className="action-button" type="button" onClick={() => openList("country", null)}>{t.list}</button>}
           </div>
-        ) : activeNotice ? <p className="map-notice" role="status">{activeNotice}</p> : null}
+        ) : (
+          <div role="status">{activeNotice && <p className="map-notice">{activeNotice}</p>}</div>
+        )}
 
         <Legend view={view} language={language} listEnabled={canList}
           onList={() => openList(map ? "view" : "country", map?.bounds() ?? null)} />
