@@ -13,3 +13,7 @@ test-results/
 *.docx
 /data/
 /public/maps/maplibre-gl-worker.mjs
+.worktrees/
+.worktrees
+
+
