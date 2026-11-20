@@ -582,22 +582,62 @@ a { color: inherit; }
 .map-notice { z-index: 2; }
 
 .map-footer {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  flex-wrap: wrap;
   flex: 0 0 auto;
-  gap: 6px 15px;
-  padding: 7px var(--edge) 8px;
+  gap: 8px;
+  padding: 0 var(--edge);
   background: var(--ground);
   border-top: 1px solid var(--line);
   color: var(--muted);
   font-size: 11px;
   line-height: 1.35;
 }
-.data-credit, .tile-credit { display: flex; align-items: center; flex-wrap: wrap; gap: 3px 10px; }
 .map-footer a { text-decoration-color: var(--line); text-underline-offset: 2px; }
 .map-footer a:hover { color: var(--text); text-decoration-color: currentColor; }
+.map-footer-brand { justify-self: start; }
+.map-repo-link { padding-block: 5px; }
+.map-credits { position: relative; justify-self: end; max-width: 100%; }
+.map-credits-trigger {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  min-height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  color: var(--text);
+  text-align: right;
+}
+.map-credits-trigger::before {
+  content: "";
+  flex: 0 0 11px;
+  height: 2px;
+  border-radius: 1px;
+  background: currentColor;
+}
+.tile-credit {
+  position: absolute;
+  right: 0;
+  bottom: 100%;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 5px 10px;
+  width: max-content;
+  max-width: min(350px, calc(100vw - var(--edge) * 2));
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px 8px 0 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 5px 16px #0003;
+}
+.tile-credit[hidden] { display: none; }
 .maptiler-logo img { display: block; height: 17px; width: auto; }
 
 .drawer {
@@ -798,7 +838,7 @@ a { color: inherit; }
   .map-navigation { bottom: 40px; }
   .maplibregl-ctrl-bottom-right { bottom: 2px; }
   .map-notice { top: 132px; }
-  .map-footer { font-size: 10px; padding-block: 5px; gap: 3px 12px; }
+  .map-footer { font-size: 10px; gap: 5px; }
   .drawer {
     top: auto;
     bottom: 0;

@@ -13,7 +13,7 @@ import { MapCanvas, type MapControls, type MapNotice } from "./map-canvas";
 import { StatsDropdown } from "./stats-dropdown";
 import { TripPlanner } from "./trip-planner";
 
-const crashDataUrl = "https://testdata.egov.bg/data/view/0c5d9df9-2162-4b32-8c12-862b259efbdc";
+const repositoryUrl = "https://github.com/KaloyanVelev/Hackaton-Project";
 
 function subscribeToConnection(onChange: () => void) {
   window.addEventListener("online", onChange);
@@ -29,9 +29,18 @@ const serverIsOffline = () => false;
 
 function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery: Imagery | null; language: Language }) {
   const t = copy[language];
+  const [hovered, setHovered] = useState(false);
+  const [expanded, setExpanded] = useState(false);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const visible = hovered || expanded;
+  const provider = basemap === "streets" ? "© OpenStreetMap" :
+    imagery === "maptiler" ? "© MapTiler" :
+      imagery === "copernicus" ? "Copernicus · EEA" :
+        imagery === "eox" ? "© EOX" : t.elevation;
+
   return (
     <footer className="map-footer">
-      <div className="data-credit">
+      <div className="map-footer-brand">
         {basemap === "satellite" && imagery === "maptiler" && (
           <a href="https://www.maptiler.com/" className="maptiler-logo" target="_blank" rel="noreferrer">
             {/* The free plan requires the linked logo in the lower-left corner. */}
@@ -39,30 +48,50 @@ function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery
             <img alt="MapTiler" src="https://api.maptiler.com/resources/logo.svg" height="16" />
           </a>
         )}
-        <a href={crashDataUrl} target="_blank" rel="noreferrer">{t.dataSource} · {t.sourceShort}</a>
       </div>
-      <div className="tile-credit" aria-label={t.mapAttribution}>
-        {basemap === "streets" ? (
-          <>
+      <a className="map-repo-link" href={repositoryUrl} target="_blank" rel="noreferrer">Check our repo</a>
+      <div className="map-credits"
+        onPointerEnter={(event) => { if (event.pointerType === "mouse") setHovered(true); }}
+        onPointerLeave={(event) => { if (event.pointerType === "mouse") setHovered(false); }}
+        onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setExpanded(false); }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape" && visible) {
+            event.stopPropagation();
+            setHovered(false);
+            setExpanded(false);
+            trigger.current?.focus();
+          }
+        }}>
+        <button ref={trigger} type="button" className="map-credits-trigger" aria-label={`${t.mapAttribution} · ${provider}`}
+          aria-expanded={visible} aria-controls="map-credits-panel"
+          onClick={(event) => {
+            if (event.detail === 0 || !window.matchMedia("(hover: hover)").matches ||
+                (event.nativeEvent instanceof PointerEvent && event.nativeEvent.pointerType !== "mouse")) {
+              setExpanded((open) => !open);
+            }
+          }}>
+          {provider}
+        </button>
+        <div id="map-credits-panel" className="tile-credit" aria-label={t.mapAttribution} hidden={!visible}>
+          {basemap === "streets" ? (
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
-            <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">{t.fixMap}</a>
-          </>
-        ) : imagery === "maptiler" ? (
-          <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noreferrer">© MapTiler</a>
-        ) : imagery === "copernicus" ? (
-          <>
-            <a href="https://sdi.eea.europa.eu/catalogue/srv/api/records/ac127b0b-8087-4889-8f99-cab372cfc0fc"
-              target="_blank" rel="noreferrer">Copernicus Land Monitoring Service · EEA</a>
-            <span>{t.clipped}</span>
-          </>
-        ) : imagery === "eox" ? (
-          <a href="https://cloudless.eox.at/" target="_blank" rel="noreferrer">
-            EOxCloudless by EOX IT Services GmbH · Contains modified Copernicus Sentinel data 2016
-          </a>
-        ) : null}
-        {basemap === "satellite" && (
-          <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noreferrer">{t.elevation}</a>
-        )}
+          ) : imagery === "maptiler" ? (
+            <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noreferrer">© MapTiler</a>
+          ) : imagery === "copernicus" ? (
+            <>
+              <a href="https://sdi.eea.europa.eu/catalogue/srv/api/records/ac127b0b-8087-4889-8f99-cab372cfc0fc"
+                target="_blank" rel="noreferrer">Copernicus Land Monitoring Service · EEA</a>
+              <span>{t.clipped}</span>
+            </>
+          ) : imagery === "eox" ? (
+            <a href="https://cloudless.eox.at/" target="_blank" rel="noreferrer">
+              EOxCloudless by EOX IT Services GmbH · Contains modified Copernicus Sentinel data 2016
+            </a>
+          ) : null}
+          {basemap === "satellite" && (
+            <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noreferrer">{t.elevation}</a>
+          )}
+        </div>
       </div>
     </footer>
   );
