@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { X, AlertTriangle, MapPin, Calendar, Clock, ShieldAlert } from "lucide-react";
+import { X, AlertTriangle, MapPin, Calendar, Clock, ShieldAlert, ExternalLink } from "lucide-react";
 import { DICTIONARY, Language } from "@/lib/i18n";
 import { CrashDetail } from "@/lib/schemas";
 
@@ -100,6 +100,27 @@ export function CrashDetailCard({ crashId, onClose, lang }: CrashDetailCardProps
             <span className="font-semibold text-dark-text bg-dark-panel px-2 py-0.5 rounded border border-dark-border">
               {data.nearby_500m_count}
             </span>
+          </div>
+
+          <div className="flex items-center gap-2 pt-2 border-t border-dark-border/40">
+            <a
+              href={`https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${data.lat},${data.lon}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 px-2 bg-dark-panel hover:bg-dark-border/80 border border-dark-border rounded-lg text-center text-[11px] font-medium text-dark-text hover:text-brand-amber transition-colors flex items-center justify-center gap-1.5"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+              <span>Street View</span>
+            </a>
+            <a
+              href={`https://www.google.com/maps/search/?api=1&query=${data.lat},${data.lon}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex-1 py-1.5 px-2 bg-dark-panel hover:bg-dark-border/80 border border-dark-border rounded-lg text-center text-[11px] font-medium text-dark-text hover:text-brand-amber transition-colors flex items-center justify-center gap-1.5"
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Google Maps</span>
+            </a>
           </div>
         </div>
       ) : (

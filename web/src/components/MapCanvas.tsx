@@ -39,6 +39,18 @@ export function MapCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleLoadedRef = useRef<boolean>(false);
+  const crashesDataRef = useRef<CrashFeatureCollection | null>(crashesData);
+
+  useEffect(() => {
+    crashesDataRef.current = crashesData;
+    const map = mapRef.current;
+    if (map && crashesData) {
+      const src = map.getSource("crashes-source") as maplibregl.GeoJSONSource | undefined;
+      if (src) {
+        src.setData(crashesData);
+      }
+    }
+  }, [crashesData]);
 
   const getFatalHex = () => {
     if (fatalColor === "amber") return "#F59E0B";
@@ -46,12 +58,31 @@ export function MapCanvas({
     return "#EF4444";
   };
 
+  const getHeatmapOpacity = (): any => {
+    if (layerMode === "bubbles") return 0;
+    if (layerMode === "heatmap" || layerMode === "both") return 0.85;
+    return ["interpolate", ["linear"], ["zoom"], 6, 0.65, 10.5, 0];
+  };
+
+  const getCircleOpacity = (): any => {
+    if (layerMode === "heatmap") return 0;
+    return dotOpacity;
+  };
+
+  const getCircleStrokeOpacity = (): any => {
+    if (layerMode === "heatmap") return 0;
+    return 0.85;
+  };
+
   const setupSourcesAndLayers = (map: MapLibreMap) => {
     if (!map.getSource("crashes-source")) {
       map.addSource("crashes-source", {
         type: "geojson",
-        data: crashesData || { type: "FeatureCollection", features: [] },
+        data: crashesDataRef.current || { type: "FeatureCollection", features: [] },
       });
+    } else if (crashesDataRef.current) {
+      const src = map.getSource("crashes-source") as maplibregl.GeoJSONSource;
+      src.setData(crashesDataRef.current);
     }
 
     if (!map.getSource("hotspots-source")) {
@@ -83,7 +114,7 @@ export function MapCanvas({
           "heatmap-weight": ["interpolate", ["linear"], ["get", "killed"], 0, 0.5, 1, 1.5, 3, 3.0],
           "heatmap-intensity": heatmapIntensity,
           "heatmap-radius": heatmapRadius,
-          "heatmap-opacity": layerMode === "bubbles" ? 0 : 0.85,
+          "heatmap-opacity": getHeatmapOpacity(),
         },
       });
     }
@@ -129,20 +160,45 @@ export function MapCanvas({
             "interpolate",
             ["linear"],
             ["zoom"],
-            7, Math.max(1.5, dotSize * 0.4),
-            11, dotSize,
-            15, dotSize * 1.8,
+            4, [
+              "case",
+              ["==", ["get", "is_fatal"], true], 3.5,
+              [">", ["get", "injured"], 0], 2.8,
+              2.2
+            ],
+            8, [
+              "case",
+              ["==", ["get", "is_fatal"], true], 5.5,
+              [">", ["get", "injured"], 0], 4.2,
+              3.5
+            ],
+            12, [
+              "case",
+              ["==", ["get", "is_fatal"], true], 8.5,
+              [">", ["get", "injured"], 0], 6.5,
+              5.0
+            ],
+            16, [
+              "case",
+              ["==", ["get", "is_fatal"], true], 13.0,
+              [">", ["get", "injured"], 0], 10.0,
+              8.0
+            ]
           ],
           "circle-color": [
             "case",
-            ["==", ["get", "is_fatal"], true],
-            getFatalHex(),
+            ["==", ["get", "is_fatal"], true], getFatalHex(),
+            [">", ["get", "injured"], 0], "#F59E0B",
             "#0284C7"
           ],
-          "circle-opacity": layerMode === "heatmap" ? 0 : dotOpacity,
-          "circle-stroke-width": 1,
+          "circle-opacity": getCircleOpacity(),
+          "circle-stroke-width": [
+            "case",
+            ["==", ["get", "is_fatal"], true], 2.0,
+            1.0
+          ],
           "circle-stroke-color": "#FFFFFF",
-          "circle-stroke-opacity": layerMode === "heatmap" ? 0 : 0.7,
+          "circle-stroke-opacity": getCircleStrokeOpacity(),
         },
       });
 
@@ -183,6 +239,9 @@ export function MapCanvas({
     });
 
     mapRef.current = map;
+    if (typeof window !== "undefined") {
+      (window as any).__map = map;
+    }
 
     return () => {
       map.remove();
@@ -204,16 +263,6 @@ export function MapCanvas({
 
     map.once("style.load", onStyleLoad);
   }, [mapVariant]);
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !styleLoadedRef.current) return;
-
-    const source = map.getSource("crashes-source") as maplibregl.GeoJSONSource | undefined;
-    if (source && crashesData) {
-      source.setData(crashesData);
-    }
-  }, [crashesData]);
 
   useEffect(() => {
     const map = mapRef.current;
@@ -254,20 +303,12 @@ export function MapCanvas({
     if (!map || !styleLoadedRef.current) return;
 
     if (map.getLayer("crash-circles")) {
-      map.setPaintProperty("crash-circles", "circle-radius", [
-        "interpolate",
-        ["linear"],
-        ["zoom"],
-        7, Math.max(1.5, dotSize * 0.4),
-        11, dotSize,
-        15, dotSize * 1.8,
-      ]);
-      map.setPaintProperty("crash-circles", "circle-opacity", layerMode === "heatmap" ? 0 : dotOpacity);
-      map.setPaintProperty("crash-circles", "circle-stroke-opacity", layerMode === "heatmap" ? 0 : 0.7);
+      map.setPaintProperty("crash-circles", "circle-opacity", getCircleOpacity());
+      map.setPaintProperty("crash-circles", "circle-stroke-opacity", getCircleStrokeOpacity());
       map.setPaintProperty("crash-circles", "circle-color", [
         "case",
-        ["==", ["get", "is_fatal"], true],
-        getFatalHex(),
+        ["==", ["get", "is_fatal"], true], getFatalHex(),
+        [">", ["get", "injured"], 0], "#F59E0B",
         "#0284C7"
       ]);
     }
@@ -275,7 +316,7 @@ export function MapCanvas({
     if (map.getLayer("crash-heatmap")) {
       map.setPaintProperty("crash-heatmap", "heatmap-intensity", heatmapIntensity);
       map.setPaintProperty("crash-heatmap", "heatmap-radius", heatmapRadius);
-      map.setPaintProperty("crash-heatmap", "heatmap-opacity", layerMode === "bubbles" ? 0 : 0.85);
+      map.setPaintProperty("crash-heatmap", "heatmap-opacity", getHeatmapOpacity());
     }
   }, [dotSize, dotOpacity, heatmapIntensity, heatmapRadius, fatalColor, layerMode]);
 
