@@ -1,4 +1,4 @@
-import type { Bounds, Crash, CrashPage, Snapshot } from "./crashes.ts";
+import type { AggregatedStats, Bounds, Crash, CrashPage, Snapshot } from "./crashes.ts";
 import { database } from "./db.ts";
 
 const snapshotFields = `
@@ -48,3 +48,91 @@ export async function listCrashes(snapshotId: string, after: number, bounds: Bou
   const crashes = rows.slice(0, pageSize);
   return { crashes, next: rows.length > pageSize ? crashes[pageSize - 1].id : null };
 }
+
+export async function getAggregatedStats(snapshotId: string): Promise<AggregatedStats> {
+  const db = database();
+  const [
+    totalsRes,
+    hourlyRes,
+    crashTypesRes,
+    regionsRes,
+    dayOfWeekRes,
+    urbanRuralRes,
+    monthlyRes,
+    roadFeaturesRes
+  ] = await Promise.all([
+    db.query<{ totalCrashes: number; totalDeaths: number; totalInjured: number }>(`
+      SELECT count(*)::int AS "totalCrashes",
+             coalesce(sum(deaths), 0)::int AS "totalDeaths",
+             coalesce(sum(injured), 0)::int AS "totalInjured"
+      FROM crashes WHERE snapshot_id = $1`, [snapshotId]),
+    db.query<{ hour: number; count: number; deaths: number; injured: number }>(`
+      SELECT (raw->>'hourofday')::int AS hour,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND raw->>'hourofday' ~ '^[0-9]+$'
+      GROUP BY 1 ORDER BY 1`, [snapshotId]),
+    db.query<{ type: string; count: number; deaths: number; injured: number }>(`
+      SELECT crash_type AS type,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND crash_type IS NOT NULL AND crash_type != ''
+      GROUP BY 1 ORDER BY count DESC LIMIT 10`, [snapshotId]),
+    db.query<{ region: string; count: number; deaths: number; injured: number }>(`
+      SELECT region,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND region IS NOT NULL AND region != ''
+      GROUP BY 1 ORDER BY count DESC LIMIT 10`, [snapshotId]),
+    db.query<{ day: number; count: number; deaths: number; injured: number }>(`
+      SELECT (raw->>'dayofweek')::int AS day,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND raw->>'dayofweek' ~ '^[1-7]$'
+      GROUP BY 1 ORDER BY 1`, [snapshotId]),
+    db.query<{ place: string; count: number; deaths: number; injured: number }>(`
+      SELECT coalesce(nullif(raw->>'ptp_place', ''), 'неуточнено') AS place,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND raw->>'ptp_place' IS NOT NULL
+      GROUP BY 1 ORDER BY count DESC`, [snapshotId]),
+    db.query<{ month: number; count: number; deaths: number; injured: number }>(`
+      SELECT (raw->>'month')::int AS month,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND raw->>'month' ~ '^[0-9]+$'
+      GROUP BY 1 ORDER BY 1`, [snapshotId]),
+    db.query<{ feature: string; count: number; deaths: number; injured: number }>(`
+      SELECT raw->>'ptp_placecharacteristics' AS feature,
+             count(*)::int AS count,
+             coalesce(sum(deaths), 0)::int AS deaths,
+             coalesce(sum(injured), 0)::int AS injured
+      FROM crashes
+      WHERE snapshot_id = $1 AND raw->>'ptp_placecharacteristics' IS NOT NULL AND raw->>'ptp_placecharacteristics' != ''
+      GROUP BY 1 ORDER BY count DESC LIMIT 8`, [snapshotId])
+  ]);
+
+  return {
+    totals: totalsRes.rows[0] ?? { totalCrashes: 0, totalDeaths: 0, totalInjured: 0 },
+    hourly: hourlyRes.rows,
+    crashTypes: crashTypesRes.rows,
+    regions: regionsRes.rows,
+    dayOfWeek: dayOfWeekRes.rows,
+    urbanRural: urbanRuralRes.rows,
+    monthly: monthlyRes.rows,
+    roadFeatures: roadFeaturesRes.rows
+  };
+}
+
