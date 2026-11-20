@@ -201,6 +201,9 @@ export function MapCanvas({
     });
 
     mapRef.current = map;
+    if (typeof window !== "undefined") {
+      (window as any).__map = map;
+    }
 
     return () => {
       map.remove();
