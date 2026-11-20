@@ -19,6 +19,7 @@
     "db:import": "node --env-file-if-exists=.env scripts/import-crashes.ts"
   },
   "dependencies": {
+    "@maplibre/maplibre-gl-style-spec": "26.9.0",
     "lucide-react": "0.468.0",
     "maplibre-gl": "6.19.0",
     "next": "16.4.6",

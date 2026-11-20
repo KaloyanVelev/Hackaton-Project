@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
-import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
+import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
 import type { Bounds, Crash, Severity } from "@/lib/crashes";
 import { severities } from "@/lib/crashes";
 import type { Language } from "@/lib/language";
@@ -95,11 +95,14 @@ function connectMap(
   let timer: number | undefined;
 
   function reset() {
-    const narrow = container.clientWidth < 620;
+    const width = container.clientWidth;
+    const padding = width < 621
+      ? { top: 128, right: 19, bottom: 104, left: 19 }
+      : width < 1180
+        ? { top: 182, right: 48, bottom: 104, left: 48 }
+        : { top: 88, right: 66, bottom: 104, left: 418 };
     map.fitBounds([[west, south], [east, north]], {
-      padding: narrow
-        ? { top: 128, right: 19, bottom: 104, left: 19 }
-        : { top: 87, right: 65, bottom: 111, left: 65 },
+      padding,
       duration: prefersStill() || !isReady ? 0 : 540,
     });
   }
@@ -206,6 +209,7 @@ function connectMap(
     }
   });
 
+  map.on("movestart", () => container.setAttribute("aria-busy", "true"));
   map.on("idle", () => {
     container.setAttribute("aria-busy", "false");
     if (pendingPoints && map.isSourceLoaded(pointSource)) {
@@ -316,7 +320,7 @@ export function MapCanvas(props: CanvasProps) {
         const [response, street] = await Promise.all([
           fetch("/maps/bulgaria.geojson", { signal: abort.signal }),
           fetch(current.current.streetsStyle, { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(4_500)]) })
-            .then(async (metadata) => metadata.ok ? await metadata.json() as StyleSpecification : null)
+            .then(async (metadata): Promise<unknown> => metadata.ok ? await metadata.json() : null)
             .catch(() => null),
         ]);
         if (!response.ok) throw new Error("The country boundary could not load.");

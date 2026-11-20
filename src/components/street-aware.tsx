@@ -151,6 +151,17 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
     });
   }, []);
 
+  function locateCrash(crash: Crash) {
+    map?.locate(crash);
+    if (window.matchMedia("(max-width: 620px)").matches) {
+      setPanel(null);
+      requestAnimationFrame(() => {
+        const canvas = workspace.current?.querySelector<HTMLCanvasElement>(".maplibregl-canvas");
+        (canvas ?? workspace.current)?.focus({ preventScroll: true });
+      });
+    }
+  }
+
   useEffect(() => {
     if (!panel) return;
     const onKey = (event: KeyboardEvent) => {
@@ -259,7 +270,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
           <CrashDrawer panel={panel} snapshotId={snapshot.id} language={language}
             onClose={closePanel} onOpen={openCrash} onSelect={setSelected}
             onBack={(list) => { setSelected(null); setPanel(list); }}
-            onLocate={map ? map.locate : null} />
+            onLocate={map ? locateCrash : null} />
         )}
       </main>
       <Attribution basemap={basemap} imagery={imagery} language={language} />

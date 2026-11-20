@@ -1,4 +1,5 @@
 import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
+import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
 import type { ExpressionSpecification, LayerSpecification, RasterSourceSpecification, StyleSpecification, VectorSourceSpecification } from "maplibre-gl";
 import type { Bounds, CrashPoints } from "./crashes";
 import type { Language } from "./language";
@@ -155,7 +156,7 @@ export function rasterSource(imagery: Imagery, bounds: Bounds, key: string | nul
   };
 }
 
-export function mapStyle(country: Country, bounds: Bounds, street: StyleSpecification | null): StyleSpecification {
+function combineMapStyle(country: Country, bounds: Bounds, street: StyleSpecification | null): StyleSpecification {
   const official = osmStyle(street, bounds);
   return {
     version: 8,
@@ -250,10 +251,31 @@ export function mapStyle(country: Country, bounds: Bounds, street: StyleSpecific
         paint: {
           "circle-radius": 11,
           "circle-color": "transparent",
-          "circle-stroke-width": 2,
-          "circle-stroke-color": "#ffffff",
+          "circle-stroke-width": 2.5,
+          "circle-stroke-color": "#7945c7",
         },
       },
     ],
   };
+}
+
+function isStreetStyle(value: unknown): value is StyleSpecification {
+  if (value === null || typeof value !== "object") return false;
+  const { version, sources, layers } = value as Partial<StyleSpecification>;
+  return version === 8 && sources !== null && typeof sources === "object" && !Array.isArray(sources) &&
+    Object.values(sources).every((source) => source !== null && typeof source === "object" && "type" in source) &&
+    Array.isArray(layers) && layers.every((layer) =>
+      layer !== null && typeof layer === "object" && typeof layer.id === "string" && typeof layer.type === "string");
+}
+
+export function mapStyle(country: Country, bounds: Bounds, street: unknown): StyleSpecification {
+  if (isStreetStyle(street)) {
+    try {
+      const combined = combineMapStyle(country, bounds, street);
+      if (validateStyleMin(combined).length === 0) return combined;
+    } catch {
+      // Fall back if a hosted style uses a construct the installed renderer cannot parse.
+    }
+  }
+  return combineMapStyle(country, bounds, null);
 }
