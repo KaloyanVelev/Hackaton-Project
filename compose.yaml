@@ -42,7 +42,7 @@ services:
       OSM_STREET_STYLE_URL: ${OSM_STREET_STYLE_URL:-}
       TRIP_ROUTING_URL: ${TRIP_ROUTING_URL:-}
     ports:
-      - "127.0.0.1:${APP_PORT:-31001}:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
