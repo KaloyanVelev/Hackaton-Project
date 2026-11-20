@@ -148,4 +148,3 @@ export async function getAggregatedStats(snapshotId: string): Promise<Aggregated
     roadFeatures: roadFeaturesRes.rows
   };
 }
-

@@ -18,14 +18,14 @@ Start Docker Desktop in Linux containers mode, then copy the environment templat
 Copy-Item .env.example .env
 ```
 
-Set `CRASH_JSON` in `.env` to the supplied JSON's absolute path. Quote paths with spaces and use forward slashes on Windows. Set `APP_PORT` if port 3000 is in use.
+Set `CRASH_JSON` in `.env` to the supplied JSON's absolute path. Quote paths with spaces and use forward slashes on Windows. Set `APP_PORT` if port 31001 is in use.
 
 ```powershell
 docker compose up -d --build
 docker compose run --rm importer
 ```
 
-Open [the local map](http://localhost:3000) at your configured port. The importer prints the date range and mapped, missing, invalid, and out-of-country counts. Supply a replacement file and run the same command to switch snapshots after a successful import. Reload the map to see the active snapshot.
+Open [the local map](http://localhost:31001) at your configured port. The importer prints the date range and mapped, missing, invalid, and out-of-country counts. Supply a replacement file and run the same command to switch snapshots after a successful import. Reload the map to see the active snapshot.
 
 ## Basemaps and data
 
