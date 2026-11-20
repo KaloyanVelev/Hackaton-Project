@@ -1,0 +1,12 @@
+.git
+.next
+.local
+.taste-skill
+.impeccable
+node_modules
+test-results
+coverage
+.env*
+*.docx
+data/
+public/maps/maplibre-gl-worker.mjs
