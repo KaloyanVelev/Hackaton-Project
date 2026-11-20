@@ -1,4 +1,4 @@
-import { notFound, databaseUnavailable } from "@/lib/http";
+import { problem, databaseUnavailable } from "@/lib/http";
 import { getCurrentSnapshot, getAggregatedStats } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(request: Request) {
     const snapshotId = snapshotParam || current?.id;
 
     if (!snapshotId) {
-      return notFound("No crash snapshot available.");
+      return problem(404, "No crash snapshot available.");
     }
 
     const stats = await getAggregatedStats(snapshotId);

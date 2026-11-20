@@ -1,12 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus } from "lucide-react";
+import { ArrowRight, BarChart3, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
 import type { Basemap, CrashView, Imagery } from "@/lib/map-style";
 import { CrashDrawer, SeverityMark, type ListPanel, type Panel } from "./crash-drawer";
 import { MapCanvas, type MapControls, type MapNotice } from "./map-canvas";
+import { StatsDropdown } from "./stats-dropdown";
 
 const crashDataUrl = "https://testdata.egov.bg/data/view/0c5d9df9-2162-4b32-8c12-862b259efbdc";
 
@@ -109,6 +110,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   const [pointsReady, setPointsReady] = useState(false);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [selected, setSelected] = useState<Crash | null>(null);
+  const [showStats, setShowStats] = useState(false);
   const offline = useSyncExternalStore(subscribeToConnection, isOffline, serverIsOffline);
   const opener = useRef<HTMLElement | null>(null);
   const workspace = useRef<HTMLElement>(null);
@@ -214,10 +216,25 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
             <Mountain size={17} aria-hidden="true" /><span>{t.satellite}</span>
           </button>
         </div>
-        <button type="button" className="language-button" aria-label={t.language}
-          onClick={() => setLanguage(language === "bg" ? "en" : "bg")}>
-          <Globe2 size={17} aria-hidden="true" />{language === "bg" ? "EN" : "BG"}
-        </button>
+        <div className="toolbar-end">
+          <button type="button" className="language-button" aria-label={t.language}
+            onClick={() => setLanguage(language === "bg" ? "en" : "bg")}>
+            <Globe2 size={17} aria-hidden="true" />{language === "bg" ? "EN" : "BG"}
+          </button>
+          <button type="button" className={`stats-toggle-button ${showStats ? "active" : ""}`}
+            aria-label={t.stats} title={t.stats} aria-expanded={showStats}
+            onClick={() => setShowStats((prev) => !prev)}>
+            <BarChart3 size={17} aria-hidden="true" />
+            <span className="stats-button-label">{t.stats}</span>
+          </button>
+          {showStats && (
+            <StatsDropdown
+              language={language}
+              snapshotId={snapshot?.id ?? null}
+              onClose={() => setShowStats(false)}
+            />
+          )}
+        </div>
       </header>
 
       <main ref={workspace} id="workspace" tabIndex={-1} className="workspace" data-points-ready={pointsReady}>
