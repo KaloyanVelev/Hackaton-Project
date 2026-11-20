@@ -41,7 +41,7 @@ services:
       MAPTILER_PUBLIC_KEY: ${MAPTILER_PUBLIC_KEY:-}
       OSM_STREET_STYLE_URL: ${OSM_STREET_STYLE_URL:-}
     ports:
-      - "127.0.0.1:${APP_PORT:-3000}:3000"
+      - "127.0.0.1:${APP_PORT:-31001}:3000"
     depends_on:
       migrate:
         condition: service_completed_successfully
