@@ -6,7 +6,7 @@ Deploy the repository with Coolify’s **Docker Compose** build strategy. The co
 
 1. In your project and environment, create a new application from the [Street Aware GitHub repository](https://github.com/KaloyanVelev/Hackaton-Project).
 2. Select branch `main` and the **Docker Compose** build strategy.
-3. Set **Base Directory** to `/` and **Docker Compose Location** to `/compose.coolify.yaml`.
+3. Set **Base Directory** to `/` and **Docker Compose Location** to `/compose.coolify.yaml`. Use Coolify’s managed Compose deployment mode.
 4. Use the generated domain for the `app` service, or add your own HTTPS domain for `app` with internal port `3000`. Coolify generates and stores the database passwords from the Compose file.
 5. Select **Deploy**. The database, migration, and seed services run before the app starts. Use the deployment logs to check that the seed restored the bundled snapshot.
 
