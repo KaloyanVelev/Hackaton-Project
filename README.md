@@ -4,6 +4,8 @@ Street Aware is a bilingual map of recorded road crashes in Bulgaria. The local 
 
 ## Run the demo
 
+If you received `data/street-aware.dump`, follow the [Docker handoff guide](HOW_TO_RUN_DOCKER.md) to restore the database and start the app.
+
 Start Docker Desktop in Linux containers mode, then copy the environment template.
 
 ```powershell
