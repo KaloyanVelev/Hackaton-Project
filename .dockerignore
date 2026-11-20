@@ -9,3 +9,4 @@ coverage
 .env*
 *.docx
 data/
+public/maps/maplibre-gl-worker.mjs

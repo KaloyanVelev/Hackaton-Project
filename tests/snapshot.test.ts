@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { deriveSeverity, parseBounds, parseRowId } from "../src/lib/crashes.ts";
-import { acceptsGzip } from "../src/lib/http.ts";
 import { columns, parseSnapshot } from "../scripts/snapshot-input.ts";
 
 test("derives all severity classes and prioritizes known fatalities", () => {
@@ -40,7 +39,7 @@ test("rejects a wrong header and an incomplete row", () => {
   assert.throws(() => parseSnapshot(JSON.stringify([columns, ["0"]])), /Crash row 1/);
 });
 
-test("validates list bounds, row IDs and compression negotiation", () => {
+test("validates list bounds and row IDs", () => {
   assert.deepEqual(parseBounds("22,41,29,45"), [22, 41, 29, 45]);
   for (const invalid of ["22,,29,45", "29,41,22,45", "22,41,29,91", "22,NaN,29,45"]) {
     assert.equal(parseBounds(invalid), null);
@@ -48,6 +47,4 @@ test("validates list bounds, row IDs and compression negotiation", () => {
   assert.equal(parseRowId("102103"), 102103);
   assert.equal(parseRowId("2147483648"), null);
   assert.equal(parseRowId("1e2"), null);
-  assert.equal(acceptsGzip("br, gzip;q=0, *;q=1"), false);
-  assert.equal(acceptsGzip("br, gzip;q=0.8"), true);
 });

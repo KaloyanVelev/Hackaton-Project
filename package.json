@@ -7,7 +7,9 @@
     "node": ">=24.0.0"
   },
   "scripts": {
+    "predev": "node scripts/prepare-map-worker.mjs",
     "dev": "next dev",
+    "prebuild": "node scripts/prepare-map-worker.mjs",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",

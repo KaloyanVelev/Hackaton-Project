@@ -12,3 +12,4 @@ next-env.d.ts
 test-results/
 *.docx
 /data/
+/public/maps/maplibre-gl-worker.mjs
