@@ -74,9 +74,10 @@ function Legend({ view, language, listEnabled, onList }: {
           <h2>{t.hotLegend}</h2>
           <div className="hotspot-key">
             <span>{t.less}</span>
-            <span className="legend-circles" aria-hidden="true"><i /><i /><i /></span>
+            <span className="heatmap-scale" aria-hidden="true" />
             <span>{t.more}</span>
           </div>
+          <p className="hotspot-hint">{t.selectHotspot}</p>
         </>
       ) : (
         <>
@@ -164,8 +165,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
     });
   }, []);
 
-  function locateCrash(crash: Crash) {
-    map?.locate(crash);
+  function returnToMapOnMobile() {
     if (window.matchMedia("(max-width: 620px)").matches) {
       setPanel(null);
       requestAnimationFrame(() => {
@@ -173,6 +173,16 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
         (canvas ?? workspace.current)?.focus({ preventScroll: true });
       });
     }
+  }
+
+  function locateCrash(crash: Crash) {
+    map?.locate(crash);
+    returnToMapOnMobile();
+  }
+
+  function zoomToArea(bounds: Bounds) {
+    map?.zoomToArea(bounds);
+    returnToMapOnMobile();
   }
 
   useEffect(() => {
@@ -186,6 +196,8 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
   const unavailableRows = snapshot ? snapshot.sourceCount - snapshot.mappedCount : 0;
   const canList = Boolean(snapshot);
+  const activeList = panel?.kind === "detail" ? panel.back : panel;
+  const selectedArea = view === "hotspots" && activeList?.area === "hotspot" ? activeList.bounds : null;
   const activeNotice = offline ? t.offline : notices.pointsError ? t.pointsError :
     basemap === "streets" && notices.streetError ? t.streetError :
       basemap === "satellite" && notices.imageryError ? t.imageryError : null;
@@ -222,10 +234,11 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
       <main ref={workspace} id="workspace" tabIndex={-1} className="workspace" data-points-ready={pointsReady}>
         <MapCanvas imageryKey={imageryKey} streetsStyle={streetsStyle} basemap={basemap} view={view} language={language} label={t.map}
-          snapshotId={snapshot?.id ?? null} selected={selected} onReady={setMap}
+          snapshotId={snapshot?.id ?? null} selected={selected} selectedArea={selectedArea} onReady={setMap}
           onUnavailable={() => setUnavailable(true)} onImagery={setImagery}
           onPointsReady={setPointsReady}
-          onNotice={onNotice} onCrash={openCrash} onOverlap={(bounds) => openList("nearby", bounds)} />
+          onNotice={onNotice} onCrash={openCrash} onHotspot={(bounds) => openList("hotspot", bounds)}
+          onOverlap={(bounds) => openList("nearby", bounds)} />
         <section className="map-intro" aria-labelledby="map-title">
           <h1 id="map-title">{t.title}</h1>
           {snapshot && (
@@ -285,7 +298,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
           <CrashDrawer panel={panel} snapshotId={snapshot.id} language={language}
             onClose={closePanel} onOpen={openCrash} onSelect={setSelected}
             onBack={(list) => { setSelected(null); setPanel(list); }}
-            onLocate={map ? locateCrash : null} />
+            onLocate={map ? locateCrash : null} onZoomArea={map ? zoomToArea : null} />
         )}
       </main>
       <Attribution basemap={basemap} imagery={imagery} language={language} />

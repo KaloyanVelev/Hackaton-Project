@@ -10,8 +10,10 @@ export type CrashView = "hotspots" | "crashes";
 export type Imagery = "maptiler" | "copernicus" | "eox";
 
 export const pointSource = "crash-points";
+export const heatmapLayer = "crash-density";
+export const hotspotSelection = "hotspot-selection";
 export const clusterCircleLayer = "crash-clusters";
-export const pointLayers = ["hotspot-single", "severity-points"];
+export const severityLayer = "severity-points";
 export const streetSource = "street-tiles";
 export const streetStyleUrl = "https://vector.openstreetmap.org/styles/shortbread/graybeard.json";
 export const streetLayerPrefix = "osm-";
@@ -176,11 +178,12 @@ function combineMapStyle(country: Country, bounds: Bounds, street: StyleSpecific
       [pointSource]: {
         type: "geojson",
         data: emptyPoints,
-        cluster: true,
+        cluster: false,
         clusterRadius: 44,
         clusterMaxZoom: 15,
         maxzoom: 18,
       },
+      [hotspotSelection]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
       "selected-crash": { type: "geojson", data: emptyPoints },
     },
     layers: [
@@ -208,37 +211,54 @@ function combineMapStyle(country: Country, bounds: Bounds, street: StyleSpecific
           "hillshade-highlight-color": "#f6f3e8",
         },
       },
+      {
+        id: heatmapLayer, type: "heatmap", source: pointSource, filter: ["!", ["has", "point_count"]],
+        paint: {
+          "heatmap-radius": ["interpolate", ["linear"], ["zoom"], 4, 13, 8, 20, 13, 25, 18, 33],
+          "heatmap-intensity": ["interpolate", ["exponential", 1.35], ["zoom"], 4, 0.0017, 7, 0.0037, 10, 0.022, 13, 0.18, 18, 0.95],
+          "heatmap-color": ["interpolate", ["linear"], ["heatmap-density"],
+            0, "rgba(42,101,220,0)", 0.06, "rgba(42,101,220,0.25)", 0.18, "#4289de",
+            0.31, "#45d2cf", 0.49, "#f5d65a", 0.68, "#f78f4c", 0.85, "#ef4f65", 1, "#b72458"],
+          "heatmap-opacity": ["interpolate", ["linear"], ["zoom"], 4, 0.73, 11, 0.86],
+        },
+      },
+      {
+        id: "hotspot-outline-halo", type: "line", source: hotspotSelection,
+        paint: { "line-color": "#ffffff", "line-opacity": 0.92, "line-width": 4 },
+      },
+      {
+        id: "hotspot-outline", type: "line", source: hotspotSelection,
+        paint: { "line-color": "#262433", "line-width": 1.8, "line-dasharray": [2.4, 1.5] },
+      },
       { id: "country-mask", type: "fill", source: "outside-country", paint: { "fill-color": "#111111" } },
       { id: "country-outline", type: "line", source: "country", paint: { "line-color": "#717171", "line-width": 1.05 } },
       countryPlaceNames(country),
       {
-        id: "hotspot-single", type: "circle", source: pointSource, filter: ["!", ["has", "point_count"]],
-        paint: { "circle-radius": 2.5, "circle-color": "#ed5360", "circle-opacity": 0.57 },
-      },
-      {
         id: clusterCircleLayer, type: "circle", source: pointSource, filter: ["has", "point_count"],
+        layout: { visibility: "none" },
         paint: {
           "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "point_count"]], 1, 10, 10, 13, 27, 19, 55, 24, 85, 29, 155, 39],
-          "circle-color": "#b9293b",
+          "circle-color": "#303842",
           "circle-opacity": 0.67,
           "circle-stroke-width": 1,
-          "circle-stroke-color": "#f97882",
+          "circle-stroke-color": "#777e87",
           "circle-stroke-opacity": 0.7,
         },
       },
       {
         id: "cluster-count", type: "symbol", source: pointSource, filter: ["has", "point_count"],
         layout: {
+          visibility: "none",
           "text-field": mapClusterCount("bg"),
           "text-font": font,
           "text-size": ["step", ["get", "point_count"], 10, 60, 11, 300, 12, 1200, 13],
           "text-allow-overlap": true,
           "text-ignore-placement": true,
         },
-        paint: { "text-color": "#ffffff", "text-halo-color": "#58232a", "text-halo-width": 0.8 },
+        paint: { "text-color": "#ffffff", "text-halo-color": "#252832", "text-halo-width": 0.8 },
       },
       {
-        id: "severity-points", type: "symbol", source: pointSource, filter: ["!", ["has", "point_count"]],
+        id: severityLayer, type: "symbol", source: pointSource, filter: ["!", ["has", "point_count"]],
         layout: {
           visibility: "none",
           "icon-image": ["concat", "severity-", ["get", "severity"]],

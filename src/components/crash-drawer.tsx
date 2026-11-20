@@ -1,13 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeft, ChevronRight, LocateFixed, X } from "lucide-react";
+import { ArrowLeft, ChevronRight, LocateFixed, X, ZoomIn } from "lucide-react";
 import type { Bounds, Crash, CrashPage, Severity } from "@/lib/crashes";
 import { copy, count, crashPlace, crashType, localDate, type Language } from "@/lib/language";
 
 export interface ListPanel {
   kind: "list";
-  area: "view" | "country" | "nearby";
+  area: "view" | "country" | "nearby" | "hotspot";
   bounds: Bounds | null;
 }
 
@@ -23,38 +23,53 @@ async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function CrashList({ panel, snapshotId, language, onOpen }: {
+function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
   panel: ListPanel;
   snapshotId: string;
   language: Language;
   onOpen: (id: number) => void;
+  onZoom: (() => void) | null;
 }) {
   const t = copy[language];
   const [rows, setRows] = useState<Crash[]>([]);
   const [next, setNext] = useState<number | null>(null);
+  const [total, setTotal] = useState<number | null>(null);
   const [cursor, setCursor] = useState<number | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "error">("loading");
   const [attempt, setAttempt] = useState(0);
   const bounds = panel.bounds?.join(",");
+  const isHotspot = panel.area === "hotspot";
 
   useEffect(() => {
     const controller = new AbortController();
     const query = new URLSearchParams();
     if (bounds) query.set("bounds", bounds);
     if (cursor !== null) query.set("after", String(cursor));
+    else if (isHotspot) query.set("includeTotal", "1");
     void read<CrashPage>(`/api/snapshots/${snapshotId}/crashes?${query}`, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
         setRows((previous) => cursor === null ? result.crashes : [...previous, ...result.crashes]);
         setNext(result.next);
+        if (result.total !== undefined) setTotal(result.total);
         setStatus("ready");
       })
       .catch(() => { if (!controller.signal.aborted) setStatus("error"); });
     return () => controller.abort();
-  }, [snapshotId, bounds, cursor, attempt]);
+  }, [snapshotId, bounds, cursor, attempt, isHotspot]);
 
   return (
     <>
+      {isHotspot && (
+        <div className="hotspot-summary">
+          <p role="status">{total !== null && <><strong>{count(language, total)}</strong> {t.hotspotCount}</>}</p>
+          {onZoom && (
+            <button className="action-button" type="button" onClick={onZoom}>
+              <ZoomIn size={16} aria-hidden="true" />{t.zoomToArea}
+            </button>
+          )}
+        </div>
+      )}
       <ul className="crash-list">
         {rows.map((crash) => (
           <li key={crash.id}>
@@ -139,7 +154,7 @@ function CrashDetail({ id, snapshotId, language, canLocate, onLocate, onSelect }
   );
 }
 
-export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBack, onLocate, onSelect }: {
+export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBack, onLocate, onSelect, onZoomArea }: {
   panel: Panel;
   snapshotId: string;
   language: Language;
@@ -148,12 +163,14 @@ export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBa
   onBack: (list: ListPanel) => void;
   onLocate: ((crash: Crash) => void) | null;
   onSelect: (crash: Crash) => void;
+  onZoomArea: ((bounds: Bounds) => void) | null;
 }) {
   const heading = useRef<HTMLHeadingElement>(null);
   const t = copy[language];
   const key = panel.kind === "detail" ? `crash-${panel.id}` : `list-${panel.area}-${panel.bounds?.join(",")}`;
-  const title = panel.kind === "detail" ? t.details :
-    panel.area === "view" ? t.viewList : panel.area === "nearby" ? t.nearbyList : t.allList;
+  const titles = { hotspot: t.hotspotList, view: t.viewList, nearby: t.nearbyList, country: t.allList };
+  const title = panel.kind === "detail" ? t.details : titles[panel.area];
+  const area = panel.kind === "list" && panel.area === "hotspot" ? panel.bounds : null;
 
   useEffect(() => { heading.current?.focus({ preventScroll: true }); }, [key]);
 
@@ -167,7 +184,8 @@ export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBa
       </div>
       <div className="drawer-body" key={key}>
         {panel.kind === "list" ? (
-          <CrashList panel={panel} snapshotId={snapshotId} language={language} onOpen={onOpen} />
+          <CrashList panel={panel} snapshotId={snapshotId} language={language} onOpen={onOpen}
+            onZoom={area && onZoomArea ? () => onZoomArea(area) : null} />
         ) : (
           <>
             {panel.back && (

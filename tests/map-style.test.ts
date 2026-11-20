@@ -2,10 +2,22 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
 import { validateStyleMin } from "@maplibre/maplibre-gl-style-spec";
-import { countryBounds, mapStyle, streetSource, type Country } from "../src/lib/map-style.ts";
+import { clusterCircleLayer, countryBounds, heatmapLayer, mapStyle, pointSource, streetSource, type Country } from "../src/lib/map-style.ts";
 
 const country = JSON.parse(readFileSync(new URL("../public/maps/bulgaria.geojson", import.meta.url), "utf8")) as Country;
 const bounds = countryBounds(country);
+
+test("Hotspots starts with unclustered heat below the country mask and place names", () => {
+  const style = mapStyle(country, bounds, null);
+  const points = style.sources[pointSource];
+  assert.equal(points.type, "geojson");
+  assert.equal(points.cluster, false);
+  const layers = style.layers.map(({ id }) => id);
+  assert.ok(layers.includes(heatmapLayer));
+  assert.ok(layers.indexOf(heatmapLayer) < layers.indexOf("country-mask"));
+  assert.ok(layers.indexOf(heatmapLayer) < layers.indexOf("osm-place-text"));
+  assert.equal(style.layers.find(({ id }) => id === clusterCircleLayer)?.layout?.visibility, "none");
+});
 
 test("an unusable hosted style falls back to the white national map and direct OSM roads", () => {
   const fallback = mapStyle(country, bounds, null);

@@ -1,21 +1,22 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { FeatureCollection, Point as GeoPoint } from "geojson";
-import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
+import type { FeatureCollection, Point as GeoPoint, Polygon } from "geojson";
+import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type Point } from "maplibre-gl";
 import type { Bounds, Crash, Severity } from "@/lib/crashes";
 import { severities } from "@/lib/crashes";
-import type { Language } from "@/lib/language";
+import { copy, type Language } from "@/lib/language";
 import {
   type Basemap, type Country, type CrashView, type Imagery,
-  clusterCircleLayer, countryBounds, emptyPoints, imageryLayer, imagerySource, mapClusterCount, mapPlaceName, mapStyle,
-  pointLayers, pointSource, rasterSource, reliefLayer, streetLayerPrefix, streetSource,
+  clusterCircleLayer, countryBounds, emptyPoints, heatmapLayer, hotspotSelection, imageryLayer, imagerySource,
+  mapClusterCount, mapPlaceName, mapStyle, pointSource, rasterSource, reliefLayer, severityLayer, streetLayerPrefix, streetSource,
 } from "@/lib/map-style";
 
 export type MapNotice = "streetError" | "imageryError" | "pointsError";
 
 export interface MapControls {
   zoom: (delta: number) => void;
+  zoomToArea: (bounds: Bounds) => void;
   reset: () => void;
   bounds: () => Bounds;
   locate: (crash: Crash) => void;
@@ -27,6 +28,7 @@ interface MapSettings {
   language: Language;
   snapshotId: string | null;
   selected: Crash | null;
+  selectedArea: Bounds | null;
 }
 
 interface CanvasProps extends MapSettings {
@@ -39,6 +41,7 @@ interface CanvasProps extends MapSettings {
   onNotice: (notice: MapNotice, show: boolean) => void;
   onPointsReady: (ready: boolean) => void;
   onCrash: (id: number) => void;
+  onHotspot: (bounds: Bounds) => void;
   onOverlap: (bounds: Bounds) => void;
 }
 
@@ -97,7 +100,7 @@ function connectMap(
   function reset() {
     const width = container.clientWidth;
     const padding = width < 621
-      ? { top: 128, right: 19, bottom: 104, left: 19 }
+      ? { top: container.clientHeight < 570 ? 105 : 128, right: 19, bottom: 140, left: 19 }
       : width < 1180
         ? { top: 182, right: 48, bottom: 104, left: 48 }
         : { top: 88, right: 66, bottom: 104, left: 418 };
@@ -156,18 +159,31 @@ function connectMap(
       map.setPaintProperty("country-outline", "line-color", isLight ? "#5b625e" : "#717171");
       showImagery();
     }
-    if (!previous || previous.view !== settings.view || previous.basemap !== settings.basemap) {
+    if (!previous || previous.view !== settings.view) {
       const hotspots = settings.view === "hotspots";
-      setLayer("hotspot-single", hotspots);
-      setLayer("severity-points", !hotspots);
-      map.setPaintProperty(clusterCircleLayer, "circle-color", hotspots ? "#b9293b" : "#303842");
-      map.setPaintProperty(clusterCircleLayer, "circle-stroke-color", hotspots ? "#ed7c85" : "#777e87");
-      map.setPaintProperty("cluster-count", "text-halo-color", hotspots ? "#682630" : "#252832");
+      setLayer(heatmapLayer, hotspots);
+      setLayer(clusterCircleLayer, !hotspots);
+      setLayer("cluster-count", !hotspots);
+      setLayer(severityLayer, !hotspots);
+      const points = map.getSource<GeoJSONSource>(pointSource);
+      if (points && Boolean(points.getClusterOptions().cluster) !== !hotspots) {
+        void points.setClusterOptions({ cluster: !hotspots });
+      }
     }
     if (!previous || previous.language !== settings.language) {
       map.getCanvas().setAttribute("aria-label", current.current.label);
       map.setLayoutProperty("osm-place-text", "text-field", mapPlaceName(settings.language));
       map.setLayoutProperty("cluster-count", "text-field", mapClusterCount(settings.language));
+    }
+    if (!previous || previous.language !== settings.language || previous.view !== settings.view) {
+      const canvas = map.getCanvas();
+      if (settings.view === "hotspots") {
+        canvas.setAttribute("aria-keyshortcuts", "Enter");
+        canvas.setAttribute("aria-description", copy[settings.language].hotspotKeyboard);
+      } else {
+        canvas.removeAttribute("aria-keyshortcuts");
+        canvas.removeAttribute("aria-description");
+      }
     }
     if (!previous || previous.snapshotId !== settings.snapshotId) {
       pendingPoints = Boolean(settings.snapshotId);
@@ -175,6 +191,17 @@ function connectMap(
       current.current.onNotice("pointsError", false);
       const data = settings.snapshotId ? `/api/snapshots/${settings.snapshotId}/points.geojson` : emptyPoints;
       map.getSource<GeoJSONSource>(pointSource)?.setData(data);
+    }
+    if (!previous || previous.selectedArea !== settings.selectedArea) {
+      const area: FeatureCollection<Polygon> = { type: "FeatureCollection", features: [] };
+      if (settings.selectedArea) {
+        const [left, bottom, right, top] = settings.selectedArea;
+        area.features.push({
+          type: "Feature", properties: {},
+          geometry: { type: "Polygon", coordinates: [[[left, bottom], [right, bottom], [right, top], [left, top], [left, bottom]]] },
+        });
+      }
+      map.getSource<GeoJSONSource>(hotspotSelection)?.setData(area);
     }
     if (!previous || previous.selected !== settings.selected) {
       const selected: FeatureCollection<GeoPoint> = { type: "FeatureCollection", features: [] };
@@ -222,6 +249,14 @@ function connectMap(
     zoom(delta) {
       map.zoomTo(map.getZoom() + delta, { duration: prefersStill() ? 0 : 260 });
     },
+    zoomToArea([left, bottom, right, top]) {
+      const width = container.clientWidth;
+      map.fitBounds([[left, bottom], [right, top]], {
+        padding: { top: width < 621 ? 125 : 30, bottom: 76, left: 26, right: width < 621 ? 26 : 405 },
+        maxZoom: 17,
+        duration: prefersStill() ? 0 : 430,
+      });
+    },
     reset,
     bounds() {
       const viewport = map.getBounds();
@@ -249,26 +284,51 @@ function connectMap(
     current.current.onReady(controls);
   });
 
-  function hitLayers() {
-    return [clusterCircleLayer, pointLayers[current.current.view === "hotspots" ? 0 : 1]];
+  const crashHitLayers = [clusterCircleLayer, severityLayer];
+
+  function canSelectArea(point: Point) {
+    return map.queryRenderedFeatures(point, { layers: ["country-ground"] }).length > 0;
   }
 
+  function selectArea(point: Point) {
+    const radius = 34;
+    const a = map.unproject([point.x - radius, point.y + radius]);
+    const b = map.unproject([point.x + radius, point.y - radius]);
+    if (current.current.snapshotId) current.current.onHotspot([a.lng, a.lat, b.lng, b.lat]);
+  }
+
+  function onCanvasKey(event: KeyboardEvent) {
+    if (!isReady || event.key !== "Enter" || current.current.view !== "hotspots") return;
+    const point = map.project(map.getCenter());
+    if (canSelectArea(point)) {
+      event.preventDefault();
+      selectArea(point);
+    }
+  }
+
+  map.getCanvas().addEventListener("keydown", onCanvasKey);
   map.on("mousemove", (event) => {
     if (!isReady) return;
-    const isTarget = map.queryRenderedFeatures(event.point, { layers: hitLayers() }).length > 0;
-    map.getCanvas().style.cursor = isTarget ? "pointer" : "";
+    const cursor = current.current.view === "hotspots"
+      ? (current.current.snapshotId && canSelectArea(event.point) ? "crosshair" : "")
+      : (map.queryRenderedFeatures(event.point, { layers: crashHitLayers }).length ? "pointer" : "");
+    map.getCanvas().style.cursor = cursor;
   });
 
   map.on("click", async (event: MapMouseEvent) => {
     if (!isReady || !current.current.snapshotId) return;
+    if (current.current.view === "hotspots") {
+      if (canSelectArea(event.point)) selectArea(event.point);
+      return;
+    }
     const { x, y } = event.point;
-    const features = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: hitLayers() });
+    const features = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: crashHitLayers });
     const cluster = features.find((feature) => feature.properties.cluster);
     if (cluster?.geometry.type === "Point") {
       const source = map.getSource<GeoJSONSource>(pointSource);
       try {
         const zoom = await source?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        if (zoom !== undefined && isReady) {
+        if (zoom !== undefined && isReady && current.current.view === "crashes") {
           map.easeTo({
             center: cluster.geometry.coordinates.slice(0, 2) as [number, number],
             zoom, duration: prefersStill() ? 0 : 480,
@@ -294,6 +354,7 @@ function connectMap(
     destroy() {
       isReady = false;
       window.clearTimeout(timer);
+      map.getCanvas().removeEventListener("keydown", onCanvasKey);
       map.remove();
     },
   };

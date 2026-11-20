@@ -231,19 +231,16 @@ a { color: inherit; }
   gap: 10px;
   align-items: center;
   color: var(--muted);
-  min-height: 48px;
+  min-height: 38px;
   font-size: 13px;
 }
-.legend-circles { display: inline-flex; align-items: center; gap: 6px; }
-.legend-circles i {
-  width: 11px;
-  height: 11px;
-  border: 1px solid #f97882;
-  border-radius: 50%;
-  background: #ed53609c;
+.heatmap-scale {
+  width: 73px;
+  height: 6px;
+  border-radius: 99px;
+  background: linear-gradient(90deg, #4289de, #45d2cf 31%, #f5d65a 57%, #f78f4c 75%, #ef4f65 91%, #b72458);
 }
-.legend-circles i:nth-child(2) { width: 17px; height: 17px; }
-.legend-circles i:nth-child(3) { width: 25px; height: 25px; }
+.hotspot-hint { max-width: 22ch; margin: 0 0 10px; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .severity-key {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -394,6 +391,17 @@ a { color: inherit; }
 .drawer-header h2 { margin: 0; font-size: 17px; line-height: 1.2; font-weight: 650; letter-spacing: -0.015em; }
 .drawer-close { flex: 0 0 44px; }
 .drawer-body { overflow: auto; min-height: 0; scrollbar-width: thin; scrollbar-color: var(--selected) transparent; }
+.hotspot-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.hotspot-summary p { margin: 0; color: var(--muted); font-size: 13px; }
+.hotspot-summary strong { margin-right: 2px; color: var(--text); font-variant-numeric: tabular-nums; }
 .crash-list { padding: 0 12px; margin: 0; list-style: none; }
 .crash-list li { border-bottom: 1px solid var(--line); }
 .crash-list button {
@@ -500,6 +508,16 @@ a { color: inherit; }
   .segmented button { padding-inline: 7px; }
   .segmented .hotspot-icon, .view-switch svg { display: none; }
   .legend { min-width: 0; width: 226px; }
+}
+
+@media (max-width: 620px) and (max-height: 710px) {
+  .map-intro { width: min(340px, calc(100% - var(--edge) * 2)); padding: 9px 12px 4px; }
+  .map-intro h1 { font-size: 18px; }
+  .period { margin-top: 5px; }
+  .legend { padding-top: 8px; }
+  .legend h2 { font-size: 12px; }
+  .hotspot-key { min-height: 28px; }
+  .hotspot-hint { max-width: none; margin-bottom: 7px; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
