@@ -7,7 +7,7 @@ x-db-client: &db-client
 x-db-owner: &db-owner
   <<: *db-client
   PGUSER: streetaware
-  PGPASSWORD: ${SERVICE_PASSWORD_64_DB:?Set the database owner password}
+  PGPASSWORD: ${SERVICE_PASSWORD_64_DB}
 
 services:
   db:
@@ -16,7 +16,7 @@ services:
     environment:
       POSTGRES_DB: streetaware
       POSTGRES_USER: streetaware
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_DB:?Set the database owner password}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_DB}
     volumes:
       - postgres:/var/lib/postgresql/data
     healthcheck:
@@ -26,6 +26,7 @@ services:
       retries: 30
 
   migrate:
+    restart: "no"
     build:
       context: .
       target: tools
@@ -35,12 +36,13 @@ services:
         condition: service_healthy
 
   seed:
+    restart: "no"
     build:
       context: .
       target: seed
     environment:
       <<: *db-owner
-      APP_DATABASE_PASSWORD: ${SERVICE_PASSWORD_64_APPDB:?Set the application database password}
+      APP_DATABASE_PASSWORD: ${SERVICE_PASSWORD_64_APPDB}
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -53,7 +55,7 @@ services:
     environment:
       <<: *db-client
       PGUSER: streetaware_reader
-      PGPASSWORD: ${SERVICE_PASSWORD_64_APPDB:?Set the application database password}
+      PGPASSWORD: ${SERVICE_PASSWORD_64_APPDB}
       SERVICE_URL_APP_3000: /
       MAPTILER_PUBLIC_KEY: ${MAPTILER_PUBLIC_KEY:-}
       OSM_STREET_STYLE_URL: ${OSM_STREET_STYLE_URL:-}
