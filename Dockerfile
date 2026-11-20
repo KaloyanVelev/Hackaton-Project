@@ -11,6 +11,13 @@ COPY public/maps ./public/maps
 COPY tests ./tests
 CMD ["npm", "run", "db:migrate"]
 
+FROM postgis/postgis:17-3.5 AS seed
+COPY data/street-aware.dump /seed/street-aware.dump
+COPY --chmod=0555 scripts/seed-deployment.sh /usr/local/bin/seed-deployment
+USER postgres
+ENTRYPOINT ["/usr/local/bin/seed-deployment"]
+CMD []
+
 FROM dependencies AS build
 COPY . .
 RUN npm run build
