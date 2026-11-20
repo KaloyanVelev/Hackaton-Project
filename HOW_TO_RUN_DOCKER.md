@@ -20,6 +20,10 @@ if (-not (Test-Path -LiteralPath './data/street-aware.dump' -PathType Leaf)) {
 docker compose -p street-aware-handoff up -d --wait db
 if ($LASTEXITCODE -ne 0) { throw 'PostGIS did not start.' }
 
+# Wait for the final server to accept TCP connections after PostGIS initialization.
+docker compose -p street-aware-handoff exec -T db sh -ec 'for i in $(seq 1 30); do pg_isready -q -h 127.0.0.1 -U streetaware -d streetaware && exit 0; sleep 1; done; exit 1'
+if ($LASTEXITCODE -ne 0) { throw 'PostGIS did not finish initializing.' }
+
 $isFresh = docker compose -p street-aware-handoff exec -T db psql -U streetaware -d streetaware -Atc "SELECT to_regclass('public.crash_snapshots') IS NULL"
 if ($LASTEXITCODE -ne 0 -or $isFresh -ne 't') {
   throw 'The database is already initialized. Keep it as-is and use a new Compose project name to restore another copy.'
@@ -28,11 +32,11 @@ if ($LASTEXITCODE -ne 0 -or $isFresh -ne 't') {
 docker compose -p street-aware-handoff cp ./data/street-aware.dump db:/tmp/street-aware.dump
 if ($LASTEXITCODE -ne 0) { throw 'Could not copy the backup into the database container.' }
 
-docker compose -p street-aware-handoff exec -T db pg_restore -U streetaware -d streetaware --no-owner --no-privileges --single-transaction /tmp/street-aware.dump
+docker compose -p street-aware-handoff exec -T db pg_restore -U streetaware -d streetaware --schema=public --no-owner --no-privileges --single-transaction /tmp/street-aware.dump
 if ($LASTEXITCODE -ne 0) { throw 'The restore failed. Check the pg_restore output before starting the app.' }
 ```
 
-The dump already contains the crash records. After restoring it, go straight to starting the app.
+The restore loads the app tables from the backup into the PostGIS database initialized by Docker. After restoring it, go straight to starting the app.
 
 ## Start and verify the app
 
