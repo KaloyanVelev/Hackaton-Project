@@ -11,7 +11,7 @@ const bg = {
   crashes: "Произшествия",
   basemap: "Вид карта",
   streets: "Улици",
-  satellite: "Сателит",
+  satellite: "Релеф",
   language: "Switch to English",
   mapCount: "на картата",
   coverage: "Покритие на данните",
@@ -42,7 +42,7 @@ const bg = {
   dataError: "Данните не можаха да се заредят.",
   pointsError: "Точките не можаха да се заредят. Списъкът остава достъпен.",
   streetError: "Уличната карта е недостъпна. Точките остават видими.",
-  imageryError: "Сателитните изображения са недостъпни. Точките остават видими.",
+  imageryError: "Въздушните изображения са недостъпни. Точките остават видими.",
   noMap: "Интерактивната карта е недостъпна на това устройство.",
   retry: "Опитайте отново",
   close: "Затвори",
@@ -57,7 +57,9 @@ const bg = {
   deaths: "Загинали",
   point: "Покажи на картата",
   clipped: "изглед само за България",
+  elevation: "Релеф от Mapzen",
   mapAttribution: "Източник на картата",
+  fixMap: "Поправка на картата",
 };
 
 const en: typeof bg = {
@@ -69,7 +71,7 @@ const en: typeof bg = {
   crashes: "Crashes",
   basemap: "Basemap",
   streets: "Streets",
-  satellite: "Satellite",
+  satellite: "Terrain",
   language: "Превключи на български",
   mapCount: "crashes mapped",
   coverage: "Data coverage",
@@ -100,7 +102,7 @@ const en: typeof bg = {
   dataError: "Crash data could not load.",
   pointsError: "Map points could not load. The list is still available.",
   streetError: "Street tiles are unavailable. Crash points are still visible.",
-  imageryError: "Satellite imagery is unavailable. Crash points are still visible.",
+  imageryError: "Aerial imagery is unavailable. Crash points are still visible.",
   noMap: "The interactive map is unavailable on this device.",
   retry: "Try again",
   close: "Close",
@@ -115,7 +117,9 @@ const en: typeof bg = {
   deaths: "Deaths",
   point: "Show on map",
   clipped: "display clipped to Bulgaria",
+  elevation: "Mapzen elevation",
   mapAttribution: "Map attribution",
+  fixMap: "Report a map issue",
 };
 
 export const copy = { bg, en };

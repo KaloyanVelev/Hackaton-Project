@@ -8,6 +8,7 @@ FROM dependencies AS tools
 COPY scripts ./scripts
 COPY src/lib ./src/lib
 COPY public/maps ./public/maps
+COPY tests ./tests
 CMD ["npm", "run", "db:migrate"]
 
 FROM dependencies AS build

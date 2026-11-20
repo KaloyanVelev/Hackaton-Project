@@ -20,11 +20,11 @@ Make it easy to move from a national view of recorded crash concentrations to th
 
 ## Capabilities and Constraints
 
-The map has Hotspots and Crashes views. Visitors can switch between Streets and Satellite without losing their place. The interface opens in Bulgarian and also supports English. Future date and severity filters are outside the first demo.
+The map has Hotspots and Crashes views. Visitors can switch between Streets and Terrain without losing their place. The interface opens in Bulgarian and also supports English.
 
 ## Brand Commitments
 
-Use the supplied Street Aware wordmarks. Streets uses charcoal and grayscale. Satellite uses white around the imagery. Crash colors follow the supplied severity scheme.
+Use the supplied Street Aware wordmarks. Streets shows white land and gray roads on charcoal. Terrain shows shaded elevation over aerial imagery on a white backdrop. Crash colors follow the supplied severity scheme.
 
 ## Evidence on Hand
 

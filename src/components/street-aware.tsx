@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Plus, Satellite } from "lucide-react";
+import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
 import type { Basemap, CrashView, Imagery } from "@/lib/map-style";
@@ -28,8 +28,7 @@ function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery
         {basemap === "streets" ? (
           <>
             <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">© OpenStreetMap</a>
-            <a href="https://openmaptiles.org/" target="_blank" rel="noreferrer">© OpenMapTiles</a>
-            <a href="https://openfreemap.org/" target="_blank" rel="noreferrer">OpenFreeMap</a>
+            <a href="https://www.openstreetmap.org/fixthemap" target="_blank" rel="noreferrer">{t.fixMap}</a>
           </>
         ) : imagery === "maptiler" ? (
           <a href="https://www.maptiler.com/copyright/" target="_blank" rel="noreferrer">© MapTiler</a>
@@ -44,6 +43,9 @@ function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery
             EOxCloudless by EOX IT Services GmbH · Contains modified Copernicus Sentinel data 2016
           </a>
         ) : null}
+        {basemap === "satellite" && (
+          <a href="https://registry.opendata.aws/terrain-tiles/" target="_blank" rel="noreferrer">{t.elevation}</a>
+        )}
       </div>
     </footer>
   );
@@ -81,7 +83,7 @@ function Legend({ view, language, listEnabled, onList }: {
   );
 }
 
-export function StreetAware({ imageryKey }: { imageryKey: string | null }) {
+export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string | null; streetsStyle: string }) {
   const [language, setLanguage] = useState<Language>("bg");
   const [basemap, setBasemap] = useState<Basemap>("streets");
   const [view, setView] = useState<CrashView>("hotspots");
@@ -185,7 +187,7 @@ export function StreetAware({ imageryKey }: { imageryKey: string | null }) {
             <MapIcon size={17} aria-hidden="true" /><span>{t.streets}</span>
           </button>
           <button type="button" title={t.satellite} aria-label={t.satellite} aria-pressed={basemap === "satellite"} onClick={() => setBasemap("satellite")}>
-            <Satellite size={17} aria-hidden="true" /><span>{t.satellite}</span>
+            <Mountain size={17} aria-hidden="true" /><span>{t.satellite}</span>
           </button>
         </div>
         <button type="button" className="language-button" aria-label={t.language}
@@ -195,7 +197,7 @@ export function StreetAware({ imageryKey }: { imageryKey: string | null }) {
       </header>
 
       <main ref={workspace} id="workspace" tabIndex={-1} className="workspace" data-points-ready={pointsReady}>
-        <MapCanvas imageryKey={imageryKey} basemap={basemap} view={view} language={language} label={t.map}
+        <MapCanvas imageryKey={imageryKey} streetsStyle={streetsStyle} basemap={basemap} view={view} language={language} label={t.map}
           snapshotId={snapshot?.id ?? null} selected={selected} onReady={setMap}
           onUnavailable={() => setUnavailable(true)} onImagery={setImagery}
           onPointsReady={setPointsReady}

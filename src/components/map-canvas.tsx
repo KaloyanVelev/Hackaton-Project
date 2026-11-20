@@ -2,14 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import type { FeatureCollection, Point as GeoPoint } from "geojson";
-import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent } from "maplibre-gl";
+import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type StyleSpecification } from "maplibre-gl";
 import type { Bounds, Crash, Severity } from "@/lib/crashes";
 import { severities } from "@/lib/crashes";
 import type { Language } from "@/lib/language";
 import {
   type Basemap, type Country, type CrashView, type Imagery,
-  clusterCircleLayer, countryBounds, emptyPoints, imageryLayer, imagerySource, mapPlaceName, mapStyle,
-  pointLayers, pointSource, rasterSource, streetLayers, streetSource,
+  clusterCircleLayer, countryBounds, emptyPoints, imageryLayer, imagerySource, mapClusterCount, mapPlaceName, mapStyle,
+  pointLayers, pointSource, rasterSource, reliefLayer, streetLayerPrefix, streetSource,
 } from "@/lib/map-style";
 
 export type MapNotice = "streetError" | "imageryError" | "pointsError";
@@ -31,6 +31,7 @@ interface MapSettings {
 
 interface CanvasProps extends MapSettings {
   imageryKey: string | null;
+  streetsStyle: string;
   label: string;
   onReady: (map: MapControls | null) => void;
   onUnavailable: () => void;
@@ -88,6 +89,7 @@ function connectMap(
   let imageryIndex = 0;
   let isReady = false;
   let streetFailed = false;
+  let streetLayers: string[] = [];
   let previous: MapSettings | null = null;
   let pendingPoints = false;
   let timer: number | undefined;
@@ -112,6 +114,7 @@ function connectMap(
 
   function showImagery() {
     window.clearTimeout(timer);
+    container.setAttribute("aria-busy", "true");
     const satellite = current.current.basemap === "satellite";
     const active = satellite ? activeImagery() : null;
     if (active && !map.getSource(imagerySource(active))) {
@@ -119,10 +122,11 @@ function connectMap(
       map.addLayer({
         id: imageryLayer(active), type: "raster", source: imagerySource(active),
         paint: { "raster-fade-duration": 150 },
-      }, streetLayers[0]);
+      }, streetLayers[0] ?? reliefLayer);
     }
     for (const imagery of imageryOptions) setLayer(imageryLayer(imagery), imagery === active);
     for (const layer of streetLayers) setLayer(layer, !satellite);
+    setLayer(reliefLayer, satellite);
     current.current.onImagery(active);
     current.current.onNotice("streetError", !satellite && streetFailed);
     current.current.onNotice("imageryError", satellite && !active);
@@ -145,23 +149,22 @@ function connectMap(
       const ground = isLight ? "#ffffff" : "#111111";
       map.setPaintProperty("frame", "background-color", ground);
       map.setPaintProperty("country-mask", "fill-color", ground);
-      map.setPaintProperty("country-ground", "fill-color", isLight ? "#e6e8e7" : "#232323");
-      map.setPaintProperty("country-outline", "line-color", isLight ? "#5b625e" : "#575757");
+      map.setPaintProperty("country-ground", "fill-color", isLight ? "#e5e7df" : "#ffffff");
+      map.setPaintProperty("country-outline", "line-color", isLight ? "#5b625e" : "#717171");
       showImagery();
     }
     if (!previous || previous.view !== settings.view || previous.basemap !== settings.basemap) {
       const hotspots = settings.view === "hotspots";
       setLayer("hotspot-single", hotspots);
       setLayer("severity-points", !hotspots);
-      map.setPaintProperty(clusterCircleLayer, "circle-color", hotspots ? "#ef4b58" : isLight ? "#222832" : "#8b919b");
-      map.setPaintProperty(clusterCircleLayer, "circle-stroke-color", hotspots ? "#f97882" : isLight ? "#262a30" : "#c3c7ce");
+      map.setPaintProperty(clusterCircleLayer, "circle-color", hotspots ? "#b9293b" : "#303842");
+      map.setPaintProperty(clusterCircleLayer, "circle-stroke-color", hotspots ? "#ed7c85" : "#777e87");
       map.setPaintProperty("cluster-count", "text-halo-color", hotspots ? "#682630" : "#252832");
     }
     if (!previous || previous.language !== settings.language) {
       map.getCanvas().setAttribute("aria-label", current.current.label);
-      for (const layer of ["road-text", "place-text"]) {
-        map.setLayoutProperty(layer, "text-field", mapPlaceName(settings.language));
-      }
+      map.setLayoutProperty("osm-place-text", "text-field", mapPlaceName(settings.language));
+      map.setLayoutProperty("cluster-count", "text-field", mapClusterCount(settings.language));
     }
     if (!previous || previous.snapshotId !== settings.snapshotId) {
       pendingPoints = Boolean(settings.snapshotId);
@@ -204,6 +207,7 @@ function connectMap(
   });
 
   map.on("idle", () => {
+    container.setAttribute("aria-busy", "false");
     if (pendingPoints && map.isSourceLoaded(pointSource)) {
       pendingPoints = false;
       current.current.onPointsReady(true);
@@ -232,6 +236,7 @@ function connectMap(
   };
 
   map.once("style.load", () => {
+    streetLayers = map.getStyle().layers.filter(({ id }) => id.startsWith(streetLayerPrefix)).map(({ id }) => id);
     for (const severity of severities) map.addImage(`severity-${severity}`, markerImage(severity), { pixelRatio: 2 });
     map.setMaxBounds([[west - 8, south - 7], [east + 8, north + 7]]);
     reset();
@@ -244,18 +249,14 @@ function connectMap(
     return [clusterCircleLayer, pointLayers[current.current.view === "hotspots" ? 0 : 1]];
   }
 
-  function isOutside(event: MapMouseEvent) {
-    return map.queryRenderedFeatures(event.point, { layers: ["country-mask"] }).length > 0;
-  }
-
   map.on("mousemove", (event) => {
     if (!isReady) return;
-    const isTarget = !isOutside(event) && map.queryRenderedFeatures(event.point, { layers: hitLayers() }).length > 0;
+    const isTarget = map.queryRenderedFeatures(event.point, { layers: hitLayers() }).length > 0;
     map.getCanvas().style.cursor = isTarget ? "pointer" : "";
   });
 
   map.on("click", async (event: MapMouseEvent) => {
-    if (!isReady || !current.current.snapshotId || isOutside(event)) return;
+    if (!isReady || !current.current.snapshotId) return;
     const { x, y } = event.point;
     const features = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: hitLayers() });
     const cluster = features.find((feature) => feature.properties.cluster);
@@ -312,7 +313,12 @@ export function MapCanvas(props: CanvasProps) {
 
     async function start(element: HTMLDivElement) {
       try {
-        const response = await fetch("/maps/bulgaria.geojson", { signal: abort.signal });
+        const [response, street] = await Promise.all([
+          fetch("/maps/bulgaria.geojson", { signal: abort.signal }),
+          fetch(current.current.streetsStyle, { signal: AbortSignal.any([abort.signal, AbortSignal.timeout(4_500)]) })
+            .then(async (metadata) => metadata.ok ? await metadata.json() as StyleSpecification : null)
+            .catch(() => null),
+        ]);
         if (!response.ok) throw new Error("The country boundary could not load.");
         const country = await response.json() as Country;
         if (disposed) return;
@@ -320,11 +326,12 @@ export function MapCanvas(props: CanvasProps) {
         setWorkerUrl(`/maps/maplibre-gl-worker.mjs?v=${getVersion()}`);
         const map = new LibreMap({
           container: element,
-          style: mapStyle(country, bounds),
+          style: mapStyle(country, bounds, street),
           center: [25.1, 42.7],
           zoom: 5.4,
           minZoom: 4,
           maxZoom: 19,
+          canvasContextAttributes: { antialias: true },
           maxPitch: 0,
           dragRotate: false,
           touchPitch: false,

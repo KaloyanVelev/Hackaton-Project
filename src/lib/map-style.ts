@@ -1,5 +1,5 @@
 import type { Feature, FeatureCollection, MultiPolygon, Polygon, Position } from "geojson";
-import type { ExpressionSpecification, LayerSpecification, RasterSourceSpecification, StyleSpecification } from "maplibre-gl";
+import type { ExpressionSpecification, LayerSpecification, RasterSourceSpecification, StyleSpecification, VectorSourceSpecification } from "maplibre-gl";
 import type { Bounds, CrashPoints } from "./crashes";
 import type { Language } from "./language";
 
@@ -12,7 +12,9 @@ export const pointSource = "crash-points";
 export const clusterCircleLayer = "crash-clusters";
 export const pointLayers = ["hotspot-single", "severity-points"];
 export const streetSource = "street-tiles";
-export const streetLayers = ["landcover", "parks", "water", "building", "road-local", "road-major", "place-text", "road-text"];
+export const streetStyleUrl = "https://vector.openstreetmap.org/styles/shortbread/graybeard.json";
+export const streetLayerPrefix = "osm-";
+export const reliefLayer = "terrain-relief";
 export const imagerySource = (imagery: Imagery) => `imagery-${imagery}`;
 export const imageryLayer = (imagery: Imagery) => `satellite-${imagery}`;
 export const emptyPoints: CrashPoints = { type: "FeatureCollection", features: [] };
@@ -61,77 +63,66 @@ function countryMask(country: Country): Feature<MultiPolygon> {
 }
 
 const font = ["sans-serif"];
-const largeRoads = ["motorway", "trunk", "primary", "secondary"];
+const neutralHighlight = "#ffffff";
+
 export function mapPlaceName(language: Language): ExpressionSpecification {
-  const fields = language === "bg" ? ["name:bg", "name"] : ["name:en", "name_en", "name:latin", "name"];
+  const fields = language === "bg" ? ["name_bg", "name"] : ["name_en", "name"];
   return ["coalesce", ...fields.map((field): ["get", string] => ["get", field]), ""];
 }
 
-const streets: LayerSpecification[] = [
-  {
-    id: "landcover", type: "fill", source: streetSource, "source-layer": "landcover",
-    paint: {
-      "fill-color": ["match", ["get", "class"], "wood", "#303030", "ice", "#3b3b3b", "#252525"],
-      "fill-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.44, 11, 0.64],
-      "fill-antialias": false,
-    },
-  },
-  {
-    id: "parks", type: "fill", source: streetSource, "source-layer": "park", minzoom: 9,
-    paint: { "fill-color": "#2e2e2e", "fill-opacity": 0.58, "fill-antialias": false },
-  },
-  {
-    id: "water", type: "fill", source: streetSource, "source-layer": "water",
-    paint: { "fill-color": "#171717", "fill-outline-color": "#383838" },
-  },
-  {
-    id: "building", type: "fill", source: streetSource, "source-layer": "building", minzoom: 13,
-    paint: { "fill-color": "#3d3d3d", "fill-outline-color": "#4b4b4b" },
-  },
-  {
-    id: "road-local", type: "line", source: streetSource, "source-layer": "transportation", minzoom: 9,
-    filter: ["!", ["in", ["get", "class"], ["literal", [...largeRoads, "rail", "transit", "ferry"]]]],
-    layout: { "line-join": "round", "line-cap": "round" },
-    paint: {
-      "line-color": "#595959",
-      "line-width": ["interpolate", ["exponential", 1.38], ["zoom"], 9, 0.35, 13, 1.1, 18, 4.8],
-    },
-  },
-  {
-    id: "road-major", type: "line", source: streetSource, "source-layer": "transportation",
-    filter: ["in", ["get", "class"], ["literal", largeRoads]],
-    layout: { "line-join": "round", "line-cap": "round" },
-    paint: {
-      "line-color": ["match", ["get", "class"], ["motorway", "trunk"], "#929292", "#666666"],
-      "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.48, 11, 0.86],
-      "line-width": ["interpolate", ["exponential", 1.32], ["zoom"], 5, 0.5, 9, 1.15, 13, 2.2, 17, 5.9],
-    },
-  },
-  {
-    id: "place-text", type: "symbol", source: streetSource, "source-layer": "place", minzoom: 5,
-    filter: ["step", ["zoom"], ["match", ["get", "class"], ["city", "town"], true, false], 10,
-      ["match", ["get", "class"], ["city", "town", "village", "suburb"], true, false]],
-    layout: {
-      "text-field": mapPlaceName("bg"),
-      "text-size": ["interpolate", ["linear"], ["zoom"], 5, 11, 11, 13, 15, 15],
-      "text-font": font,
-      "text-padding": 6,
-      "symbol-sort-key": ["coalesce", ["get", "rank"], 50],
-    },
-    paint: { "text-color": "#d0d0d0", "text-halo-color": "#1b1b1b", "text-halo-width": 1.15 },
-  },
-  {
-    id: "road-text", type: "symbol", source: streetSource, "source-layer": "transportation_name", minzoom: 13,
+export function mapClusterCount(language: Language): ExpressionSpecification {
+  return ["number-format", ["get", "point_count"], { locale: language === "bg" ? "bg-BG" : "en-GB" }];
+}
+
+function osmStyle(upstream: StyleSpecification | null, bounds: Bounds) {
+  const entry = upstream && Object.entries(upstream.sources).find(([, source]) => source.type === "vector");
+  const fallback: VectorSourceSpecification = {
+    type: "vector", url: "https://vector.openstreetmap.org/shortbread_v1/tilejson.json", bounds,
+  };
+  if (!entry || !upstream) {
+    const layers: LayerSpecification[] = [
+      { id: "osm-water", type: "fill", source: streetSource, "source-layer": "water_polygons", paint: { "fill-color": "#dedfe0" } },
+      {
+        id: "osm-roads", type: "line", source: streetSource, "source-layer": "streets",
+        paint: {
+          "line-color": ["match", ["get", "kind"], ["motorway", "trunk", "primary"], "#86888c", "#acafb2"],
+          "line-width": ["interpolate", ["exponential", 1.2], ["zoom"], 5, 0.6, 10, 1.15, 17, 5],
+        },
+      },
+    ];
+    return { source: fallback, layers, sprite: undefined };
+  }
+
+  const [sourceId, source] = entry;
+  const layers = upstream.layers.flatMap((layer): LayerSpecification[] => {
+    if (!("source" in layer) || layer.source !== sourceId || layer.layout?.visibility === "none") return [];
+    if (layer.type === "symbol" && (layer["source-layer"] === "place_labels" || layer["source-layer"] === "boundary_labels")) return [];
+    const id = streetLayerPrefix + layer.id;
+    if (layer.type === "symbol") {
+      // Local glyphs keep the labels and crash counts sharp and available during tile outages.
+      return [{ ...layer, id, source: streetSource, layout: { ...layer.layout, "text-font": font } }];
+    }
+    return [{ ...layer, id, source: streetSource }];
+  });
+  return { source: { ...(source as VectorSourceSpecification), bounds }, layers, sprite: upstream.sprite };
+}
+
+function countryPlaceNames(country: Country): LayerSpecification {
+  return {
+    id: "osm-place-text", type: "symbol", source: streetSource, "source-layer": "place_labels", minzoom: 5,
+    filter: ["all", ["within", country], ["step", ["zoom"],
+      ["match", ["get", "kind"], ["city", "town"], true, false], 10,
+      ["match", ["get", "kind"], ["city", "town", "village", "suburb"], true, false]]],
     layout: {
       "text-field": mapPlaceName("bg"),
       "text-font": font,
-      "text-size": 11,
-      "symbol-placement": "line",
-      "text-max-angle": 35,
+      "text-size": ["interpolate", ["linear"], ["zoom"], 5, 10, 10, 12, 15, 15],
+      "text-padding": 5,
+      "symbol-sort-key": ["-", ["coalesce", ["to-number", ["get", "population"]], 0]],
     },
-    paint: { "text-color": "#bdbdbd", "text-halo-color": "#202020", "text-halo-width": 1.15 },
-  },
-];
+    paint: { "text-color": "#4b4e54", "text-halo-color": neutralHighlight, "text-halo-width": 1.2 },
+  };
+}
 
 export function rasterSource(imagery: Imagery, bounds: Bounds, key: string | null): RasterSourceSpecification {
   if (imagery === "maptiler") {
@@ -164,13 +155,23 @@ export function rasterSource(imagery: Imagery, bounds: Bounds, key: string | nul
   };
 }
 
-export function mapStyle(country: Country, bounds: Bounds): StyleSpecification {
+export function mapStyle(country: Country, bounds: Bounds, street: StyleSpecification | null): StyleSpecification {
+  const official = osmStyle(street, bounds);
   return {
     version: 8,
+    sprite: official.sprite,
     sources: {
       country: { type: "geojson", data: country, tolerance: 0 },
       "outside-country": { type: "geojson", data: countryMask(country), tolerance: 0 },
-      [streetSource]: { type: "vector", url: "https://tiles.openfreemap.org/planet", bounds },
+      [streetSource]: official.source,
+      "elevation": {
+        type: "raster-dem",
+        tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"],
+        encoding: "terrarium",
+        tileSize: 256,
+        maxzoom: 14,
+        bounds,
+      },
       [pointSource]: {
         type: "geojson",
         data: emptyPoints,
@@ -183,8 +184,32 @@ export function mapStyle(country: Country, bounds: Bounds): StyleSpecification {
     },
     layers: [
       { id: "frame", type: "background", paint: { "background-color": "#111111" } },
-      { id: "country-ground", type: "fill", source: "country", paint: { "fill-color": "#232323" } },
-      ...streets,
+      { id: "country-ground", type: "fill", source: "country", paint: { "fill-color": "#ffffff" } },
+      ...official.layers,
+      {
+        id: "osm-national-roads", type: "line", source: streetSource, "source-layer": "streets", minzoom: 5, maxzoom: 8,
+        filter: ["in", ["get", "kind"], ["literal", ["motorway", "trunk", "primary"]]],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: {
+          "line-color": "#777b80",
+          "line-opacity": ["interpolate", ["linear"], ["zoom"], 5, 0.45, 6.8, 0.56, 8, 0],
+          "line-width": ["interpolate", ["linear"], ["zoom"], 5, 0.53, 7.5, 1.1],
+        },
+      },
+      {
+        id: reliefLayer, type: "hillshade", source: "elevation", layout: { visibility: "none" },
+        paint: {
+          "hillshade-method": "combined",
+          "hillshade-exaggeration": 0.66,
+          "hillshade-illumination-direction": 315,
+          "hillshade-shadow-color": "#272c28",
+          "hillshade-accent-color": "#303a32",
+          "hillshade-highlight-color": "#f6f3e8",
+        },
+      },
+      { id: "country-mask", type: "fill", source: "outside-country", paint: { "fill-color": "#111111" } },
+      { id: "country-outline", type: "line", source: "country", paint: { "line-color": "#717171", "line-width": 1.05 } },
+      countryPlaceNames(country),
       {
         id: "hotspot-single", type: "circle", source: pointSource, filter: ["!", ["has", "point_count"]],
         paint: { "circle-radius": 2.5, "circle-color": "#ed5360", "circle-opacity": 0.57 },
@@ -192,9 +217,9 @@ export function mapStyle(country: Country, bounds: Bounds): StyleSpecification {
       {
         id: clusterCircleLayer, type: "circle", source: pointSource, filter: ["has", "point_count"],
         paint: {
-          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "point_count"]], 1, 10, 10, 14, 27, 21, 55, 28, 85, 34, 155, 44],
-          "circle-color": "#ef4b58",
-          "circle-opacity": 0.57,
+          "circle-radius": ["interpolate", ["linear"], ["sqrt", ["get", "point_count"]], 1, 10, 10, 13, 27, 19, 55, 24, 85, 29, 155, 39],
+          "circle-color": "#b9293b",
+          "circle-opacity": 0.67,
           "circle-stroke-width": 1,
           "circle-stroke-color": "#f97882",
           "circle-stroke-opacity": 0.7,
@@ -203,7 +228,7 @@ export function mapStyle(country: Country, bounds: Bounds): StyleSpecification {
       {
         id: "cluster-count", type: "symbol", source: pointSource, filter: ["has", "point_count"],
         layout: {
-          "text-field": ["to-string", ["get", "point_count"]],
+          "text-field": mapClusterCount("bg"),
           "text-font": font,
           "text-size": ["step", ["get", "point_count"], 10, 60, 11, 300, 12, 1200, 13],
           "text-allow-overlap": true,
@@ -229,8 +254,6 @@ export function mapStyle(country: Country, bounds: Bounds): StyleSpecification {
           "circle-stroke-color": "#ffffff",
         },
       },
-      { id: "country-mask", type: "fill", source: "outside-country", paint: { "fill-color": "#111111" } },
-      { id: "country-outline", type: "line", source: "country", paint: { "line-color": "#575757", "line-width": 1.15 } },
     ],
   };
 }
