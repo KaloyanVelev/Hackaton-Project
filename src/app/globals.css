@@ -1,12 +1,30 @@
 :root {
   font-family: "Segoe UI", system-ui, sans-serif;
   background: #111111;
+  color: #f7f7f7;
+  color-scheme: dark;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  --ground: #111111;
+  --surface: #1a1a1e;
+  --control: #222228;
+  --selected: #363640;
+  --hover: #2a2a32;
+  --text: #f7f7f7;
+  --muted: #a1a1aa;
+  --line: #2e2e38;
+  --focus: #c9b0ff;
+  --blue: #469bff;
+  --red: #e64250;
+  --unknown: #9ba4ae;
+  --edge: clamp(18px, 2.5vw, 38px);
 }
 
 *, *::before, *::after { box-sizing: border-box; }
-body { margin: 0; }
+body { margin: 0; background: var(--ground); color: var(--text); }
 button, summary { font: inherit; }
 button { color: inherit; cursor: pointer; }
 button:disabled { cursor: default; }
@@ -14,19 +32,6 @@ button :where(svg), summary :where(svg) { flex: 0 0 auto; }
 a { color: inherit; }
 
 .app-shell {
-  --ground: #111111;
-  --surface: #1b1b1b;
-  --control: #202020;
-  --selected: #353535;
-  --hover: #292929;
-  --text: #f7f7f7;
-  --muted: #b9b9b9;
-  --line: #333333;
-  --focus: #c9b0ff;
-  --blue: #469bff;
-  --red: #e64250;
-  --unknown: #9ba4ae;
-  --edge: clamp(18px, 2.5vw, 38px);
   display: flex;
   flex-direction: column;
   block-size: 100dvh;
@@ -231,16 +236,16 @@ a { color: inherit; }
   gap: 5px;
   font-size: 11px;
   font-weight: 600;
-  color: var(--muted);
+  color: #cbd5e1;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
   margin-bottom: 6px;
 }
 .stat-hero-number {
   font-size: 26px;
   font-weight: 800;
   line-height: 1.1;
-  color: var(--text);
+  color: #ffffff;
   letter-spacing: -0.03em;
   display: flex;
   align-items: baseline;
@@ -249,18 +254,18 @@ a { color: inherit; }
 .stat-hero-label {
   font-size: 12px;
   font-weight: 500;
-  color: var(--muted);
+  color: #94a3b8;
   letter-spacing: normal;
 }
 .stat-summary-text {
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--text);
+  font-size: 13px;
+  line-height: 1.5;
+  color: #f1f5f9;
   margin-top: 8px;
   margin-bottom: 10px;
 }
 .stat-summary-text small {
-  color: var(--muted);
+  color: #94a3b8;
 }
 .mini-bars {
   display: flex;
@@ -291,9 +296,9 @@ a { color: inherit; }
   background: var(--control);
   border: 1px solid var(--line);
   color: var(--text);
-  width: 26px;
-  height: 26px;
-  border-radius: 6px;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -301,25 +306,27 @@ a { color: inherit; }
 }
 .carousel-arrow-btn:hover {
   background: var(--hover);
+  border-color: #cbd5e1;
 }
 .carousel-dots {
   display: flex;
-  gap: 6px;
+  gap: 4px;
   align-items: center;
 }
 .carousel-dot {
-  width: 7px;
-  height: 7px;
+  width: 8px;
+  height: 8px;
   border-radius: 50%;
   border: 0;
   background: var(--line);
   padding: 0;
+  margin: 6px 3px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 .carousel-dot.active {
   background: #f97316;
-  width: 14px;
+  width: 16px;
   border-radius: 4px;
 }
 .stats-dropdown-footer {
@@ -817,12 +824,12 @@ a { color: inherit; }
   font-weight: 800;
   letter-spacing: -0.03em;
   margin: 0 0 6px;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .stats-subtitle {
   font-size: 14px;
-  color: var(--muted);
+  color: #cbd5e1;
   margin: 0;
 }
 
@@ -902,21 +909,22 @@ a { color: inherit; }
 }
 
 .kpi-label {
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: var(--muted);
+  color: #cbd5e1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .kpi-value {
-  font-size: 22px;
+  font-size: 24px;
   font-weight: 800;
   letter-spacing: -0.02em;
-  color: var(--text);
+  color: #ffffff;
+  font-variant-numeric: tabular-nums;
   line-height: 1.2;
 }
 
@@ -948,14 +956,14 @@ a { color: inherit; }
   margin: 0 0 4px;
   font-size: 16px;
   font-weight: 700;
-  color: var(--text);
+  color: #ffffff;
 }
 
 .chart-card-header p {
   margin: 0;
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.4;
+  font-size: 13px;
+  color: #cbd5e1;
+  line-height: 1.45;
 }
 
 .chart-canvas-container {

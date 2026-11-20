@@ -49,31 +49,31 @@ export function StatsCharts({ stats, language }: ChartsProps) {
       legend: {
         position: "top",
         labels: {
-          color: "#94a3b8",
+          color: "#f1f5f9",
           font: { size: 12, weight: 600 },
-          boxWidth: 12,
+          boxWidth: 14,
           padding: 14,
         },
       },
       tooltip: {
-        backgroundColor: "rgba(15, 23, 42, 0.95)",
-        titleColor: "#f8fafc",
-        bodyColor: "#cbd5e1",
-        borderColor: "rgba(255, 255, 255, 0.15)",
+        backgroundColor: "rgba(15, 23, 42, 0.96)",
+        titleColor: "#ffffff",
+        bodyColor: "#f1f5f9",
+        borderColor: "rgba(255, 255, 255, 0.2)",
         borderWidth: 1,
-        padding: 10,
+        padding: 11,
         cornerRadius: 8,
         displayColors: true,
       },
     },
     scales: {
       x: {
-        ticks: { color: "#94a3b8", font: { size: 11 } },
-        grid: { color: "rgba(255, 255, 255, 0.06)" },
+        ticks: { color: "#cbd5e1", font: { size: 11, weight: 500 } },
+        grid: { color: "rgba(255, 255, 255, 0.08)" },
       },
       y: {
-        ticks: { color: "#94a3b8", font: { size: 11 } },
-        grid: { color: "rgba(255, 255, 255, 0.06)" },
+        ticks: { color: "#cbd5e1", font: { size: 11, weight: 500 } },
+        grid: { color: "rgba(255, 255, 255, 0.08)" },
       },
     },
   };
@@ -219,7 +219,7 @@ export function StatsCharts({ stats, language }: ChartsProps) {
       r: {
         angleLines: { color: "rgba(255, 255, 255, 0.1)" },
         grid: { color: "rgba(255, 255, 255, 0.08)" },
-        pointLabels: { color: "#cbd5e1", font: { size: 12, weight: 600 } },
+        pointLabels: { color: "#f1f5f9", font: { size: 12, weight: 600 } },
         ticks: { display: false },
       },
     },
