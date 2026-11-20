@@ -46,6 +46,24 @@ export function MapCanvas({
     return "#EF4444";
   };
 
+  const getHeatmapOpacity = (): any => {
+    if (layerMode === "bubbles") return 0;
+    if (layerMode === "heatmap" || layerMode === "both") return 0.85;
+    return ["interpolate", ["linear"], ["zoom"], 8.5, 0.85, 10.5, 0];
+  };
+
+  const getCircleOpacity = (): any => {
+    if (layerMode === "heatmap") return 0;
+    if (layerMode === "bubbles" || layerMode === "both") return dotOpacity;
+    return ["interpolate", ["linear"], ["zoom"], 8.5, 0, 10.5, dotOpacity];
+  };
+
+  const getCircleStrokeOpacity = (): any => {
+    if (layerMode === "heatmap") return 0;
+    if (layerMode === "bubbles" || layerMode === "both") return 0.7;
+    return ["interpolate", ["linear"], ["zoom"], 8.5, 0, 10.5, 0.7];
+  };
+
   const setupSourcesAndLayers = (map: MapLibreMap) => {
     if (!map.getSource("crashes-source")) {
       map.addSource("crashes-source", {
@@ -83,7 +101,7 @@ export function MapCanvas({
           "heatmap-weight": ["interpolate", ["linear"], ["get", "killed"], 0, 0.5, 1, 1.5, 3, 3.0],
           "heatmap-intensity": heatmapIntensity,
           "heatmap-radius": heatmapRadius,
-          "heatmap-opacity": layerMode === "bubbles" ? 0 : 0.85,
+          "heatmap-opacity": getHeatmapOpacity(),
         },
       });
     }
@@ -139,10 +157,10 @@ export function MapCanvas({
             getFatalHex(),
             "#0284C7"
           ],
-          "circle-opacity": layerMode === "heatmap" ? 0 : dotOpacity,
+          "circle-opacity": getCircleOpacity(),
           "circle-stroke-width": 1,
           "circle-stroke-color": "#FFFFFF",
-          "circle-stroke-opacity": layerMode === "heatmap" ? 0 : 0.7,
+          "circle-stroke-opacity": getCircleStrokeOpacity(),
         },
       });
 
@@ -262,8 +280,8 @@ export function MapCanvas({
         11, dotSize,
         15, dotSize * 1.8,
       ]);
-      map.setPaintProperty("crash-circles", "circle-opacity", layerMode === "heatmap" ? 0 : dotOpacity);
-      map.setPaintProperty("crash-circles", "circle-stroke-opacity", layerMode === "heatmap" ? 0 : 0.7);
+      map.setPaintProperty("crash-circles", "circle-opacity", getCircleOpacity());
+      map.setPaintProperty("crash-circles", "circle-stroke-opacity", getCircleStrokeOpacity());
       map.setPaintProperty("crash-circles", "circle-color", [
         "case",
         ["==", ["get", "is_fatal"], true],
@@ -275,7 +293,7 @@ export function MapCanvas({
     if (map.getLayer("crash-heatmap")) {
       map.setPaintProperty("crash-heatmap", "heatmap-intensity", heatmapIntensity);
       map.setPaintProperty("crash-heatmap", "heatmap-radius", heatmapRadius);
-      map.setPaintProperty("crash-heatmap", "heatmap-opacity", layerMode === "bubbles" ? 0 : 0.85);
+      map.setPaintProperty("crash-heatmap", "heatmap-opacity", getHeatmapOpacity());
     }
   }, [dotSize, dotOpacity, heatmapIntensity, heatmapRadius, fatalColor, layerMode]);
 
