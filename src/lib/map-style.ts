@@ -12,6 +12,7 @@ export type Imagery = "maptiler" | "copernicus" | "eox";
 export const pointSource = "crash-points";
 export const heatmapLayer = "crash-density";
 export const hotspotSelection = "hotspot-selection";
+export const tripSource = "trip-route";
 export const clusterCircleLayer = "crash-clusters";
 export const severityLayer = "severity-points";
 export const streetSource = "street-tiles";
@@ -185,6 +186,7 @@ function combineMapStyle(country: Country, bounds: Bounds, street: StyleSpecific
       },
       [hotspotSelection]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
       "selected-crash": { type: "geojson", data: emptyPoints },
+      [tripSource]: { type: "geojson", data: { type: "FeatureCollection", features: [] } },
     },
     layers: [
       { id: "frame", type: "background", paint: { "background-color": "#111111" } },
@@ -274,6 +276,30 @@ function combineMapStyle(country: Country, bounds: Bounds, street: StyleSpecific
           "circle-stroke-width": 2.5,
           "circle-stroke-color": "#7945c7",
         },
+      },
+      {
+        id: "trip-route-halo", type: "line", source: tripSource, filter: ["==", ["geometry-type"], "LineString"],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#ffffff", "line-width": 8, "line-opacity": 0.93 },
+      },
+      {
+        id: "trip-route-line", type: "line", source: tripSource, filter: ["==", ["geometry-type"], "LineString"],
+        layout: { "line-cap": "round", "line-join": "round" },
+        paint: { "line-color": "#5f35bf", "line-width": 4.5 },
+      },
+      {
+        id: "trip-samples", type: "circle", source: tripSource, filter: ["==", ["geometry-type"], "Point"],
+        paint: {
+          "circle-color": "#3b207b", "circle-radius": 10, "circle-stroke-color": "#ffffff", "circle-stroke-width": 2,
+        },
+      },
+      {
+        id: "trip-sample-numbers", type: "symbol", source: tripSource, filter: ["==", ["geometry-type"], "Point"],
+        layout: {
+          "text-field": ["to-string", ["get", "number"]],
+          "text-font": font, "text-size": 10, "text-allow-overlap": true, "text-ignore-placement": true,
+        },
+        paint: { "text-color": "#ffffff" },
       },
     ],
   };

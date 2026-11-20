@@ -1,15 +1,17 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { FeatureCollection, Point as GeoPoint, Polygon } from "geojson";
+import type { FeatureCollection, LineString, Point as GeoPoint, Polygon } from "geojson";
 import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type Point } from "maplibre-gl";
 import type { Bounds, Crash, Severity } from "@/lib/crashes";
 import { severities } from "@/lib/crashes";
 import { copy, type Language } from "@/lib/language";
+import type { TripResult } from "@/lib/trip";
 import {
   type Basemap, type Country, type CrashView, type Imagery,
   clusterCircleLayer, countryBounds, emptyPoints, heatmapLayer, hotspotSelection, imageryLayer, imagerySource,
   mapClusterCount, mapPlaceName, mapStyle, pointSource, rasterSource, reliefLayer, severityLayer, streetLayerPrefix, streetSource,
+  tripSource,
 } from "@/lib/map-style";
 
 export type MapNotice = "streetError" | "imageryError" | "pointsError";
@@ -29,6 +31,8 @@ interface MapSettings {
   snapshotId: string | null;
   selected: Crash | null;
   selectedArea: Bounds | null;
+  trip: TripResult | null;
+  inspectCrashes: boolean;
 }
 
 interface CanvasProps extends MapSettings {
@@ -159,12 +163,13 @@ function connectMap(
       map.setPaintProperty("country-outline", "line-color", isLight ? "#5b625e" : "#717171");
       showImagery();
     }
-    if (!previous || previous.view !== settings.view) {
+    if (!previous || previous.view !== settings.view || Boolean(previous.trip) !== Boolean(settings.trip)) {
       const hotspots = settings.view === "hotspots";
-      setLayer(heatmapLayer, hotspots);
-      setLayer(clusterCircleLayer, !hotspots);
-      setLayer("cluster-count", !hotspots);
-      setLayer(severityLayer, !hotspots);
+      const showCrashData = !settings.trip;
+      setLayer(heatmapLayer, hotspots && showCrashData);
+      setLayer(clusterCircleLayer, !hotspots && showCrashData);
+      setLayer("cluster-count", !hotspots && showCrashData);
+      setLayer(severityLayer, !hotspots && showCrashData);
       const points = map.getSource<GeoJSONSource>(pointSource);
       if (points && Boolean(points.getClusterOptions().cluster) !== !hotspots) {
         void points.setClusterOptions({ cluster: !hotspots });
@@ -175,9 +180,10 @@ function connectMap(
       map.setLayoutProperty("osm-place-text", "text-field", mapPlaceName(settings.language));
       map.setLayoutProperty("cluster-count", "text-field", mapClusterCount(settings.language));
     }
-    if (!previous || previous.language !== settings.language || previous.view !== settings.view) {
+    if (!previous || previous.language !== settings.language || previous.view !== settings.view ||
+        previous.inspectCrashes !== settings.inspectCrashes) {
       const canvas = map.getCanvas();
-      if (settings.view === "hotspots") {
+      if (settings.view === "hotspots" && settings.inspectCrashes) {
         canvas.setAttribute("aria-keyshortcuts", "Enter");
         canvas.setAttribute("aria-description", copy[settings.language].hotspotKeyboard);
       } else {
@@ -202,6 +208,34 @@ function connectMap(
         });
       }
       map.getSource<GeoJSONSource>(hotspotSelection)?.setData(area);
+    }
+    if (!previous || previous.trip !== settings.trip) {
+      const features: FeatureCollection<LineString | GeoPoint> = { type: "FeatureCollection", features: [] };
+      if (settings.trip) {
+        const { route, points } = settings.trip;
+        features.features.push({ type: "Feature", geometry: route, properties: {} });
+        features.features.push(...points.map(({ longitude, latitude, number }) => ({
+          type: "Feature" as const, geometry: { type: "Point" as const, coordinates: [longitude, latitude] },
+          properties: { number },
+        })));
+        const [left, bottom, right, top] = route.coordinates.reduce<Bounds>(
+          ([w, s, e, n], [lng, lat]) => [Math.min(w, lng), Math.min(s, lat), Math.max(e, lng), Math.max(n, lat)],
+          [180, 90, -180, -90],
+        );
+        const width = container.clientWidth;
+        const narrow = width < 621;
+        map.fitBounds([[left, bottom], [right, top]], {
+          padding: {
+            top: narrow ? 45 : 65,
+            left: width >= 1180 ? 402 : 34,
+            right: narrow ? 34 : Math.min(414, Math.round(width * 0.47)),
+            bottom: narrow ? Math.min(310, Math.round(container.clientHeight * 0.56)) : 60,
+          },
+          maxZoom: 13,
+          duration: prefersStill() ? 0 : 550,
+        });
+      }
+      map.getSource<GeoJSONSource>(tripSource)?.setData(features);
     }
     if (!previous || previous.selected !== settings.selected) {
       const selected: FeatureCollection<GeoPoint> = { type: "FeatureCollection", features: [] };
@@ -298,7 +332,7 @@ function connectMap(
   }
 
   function onCanvasKey(event: KeyboardEvent) {
-    if (!isReady || event.key !== "Enter" || current.current.view !== "hotspots") return;
+    if (!isReady || !current.current.inspectCrashes || event.key !== "Enter" || current.current.view !== "hotspots") return;
     const point = map.project(map.getCenter());
     if (canSelectArea(point)) {
       event.preventDefault();
@@ -309,6 +343,10 @@ function connectMap(
   map.getCanvas().addEventListener("keydown", onCanvasKey);
   map.on("mousemove", (event) => {
     if (!isReady) return;
+    if (!current.current.inspectCrashes) {
+      map.getCanvas().style.cursor = "";
+      return;
+    }
     const cursor = current.current.view === "hotspots"
       ? (current.current.snapshotId && canSelectArea(event.point) ? "crosshair" : "")
       : (map.queryRenderedFeatures(event.point, { layers: crashHitLayers }).length ? "pointer" : "");
@@ -316,7 +354,7 @@ function connectMap(
   });
 
   map.on("click", async (event: MapMouseEvent) => {
-    if (!isReady || !current.current.snapshotId) return;
+    if (!isReady || !current.current.inspectCrashes || !current.current.snapshotId) return;
     if (current.current.view === "hotspots") {
       if (canSelectArea(event.point)) selectArea(event.point);
       return;

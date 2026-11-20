@@ -1,12 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus } from "lucide-react";
+import { ArrowRight, CalendarDays, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus, Route } from "lucide-react";
 import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
 import type { Basemap, CrashView, Imagery } from "@/lib/map-style";
+import type { TripResult } from "@/lib/trip";
+import { tripCopy } from "@/lib/trip-copy";
 import { CrashDrawer, SeverityMark, type ListPanel, type Panel } from "./crash-drawer";
 import { MapCanvas, type MapControls, type MapNotice } from "./map-canvas";
+import { TripPlanner } from "./trip-planner";
 
 const crashDataUrl = "https://testdata.egov.bg/data/view/0c5d9df9-2162-4b32-8c12-862b259efbdc";
 
@@ -110,8 +113,11 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   const [pointsReady, setPointsReady] = useState(false);
   const [panel, setPanel] = useState<Panel | null>(null);
   const [selected, setSelected] = useState<Crash | null>(null);
+  const [tripOpen, setTripOpen] = useState(false);
+  const [trip, setTrip] = useState<TripResult | null>(null);
   const offline = useSyncExternalStore(subscribeToConnection, isOffline, serverIsOffline);
   const opener = useRef<HTMLElement | null>(null);
+  const tripButton = useRef<HTMLButtonElement>(null);
   const workspace = useRef<HTMLElement>(null);
   const t = copy[language];
 
@@ -146,6 +152,8 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
   const openList = useCallback((area: ListPanel["area"], bounds: Bounds | null) => {
     if (!panel) rememberFocus();
+    setTripOpen(false);
+    setTrip(null);
     setSelected(null);
     setPanel({ kind: "list", area, bounds });
   }, [panel, rememberFocus]);
@@ -164,6 +172,22 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
       target?.focus({ preventScroll: true });
     });
   }, []);
+
+  const closeTrip = useCallback(() => {
+    setTripOpen(false);
+    setTrip(null);
+    requestAnimationFrame(() => tripButton.current?.focus({ preventScroll: true }));
+  }, []);
+
+  function toggleTrip() {
+    if (tripOpen) {
+      closeTrip();
+      return;
+    }
+    setPanel(null);
+    setSelected(null);
+    setTripOpen(true);
+  }
 
   function returnToMapOnMobile() {
     if (window.matchMedia("(max-width: 620px)").matches) {
@@ -186,13 +210,16 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   }
 
   useEffect(() => {
-    if (!panel) return;
+    if (!panel && !tripOpen) return;
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") closePanel();
+      if (event.key === "Escape") {
+        if (tripOpen) closeTrip();
+        else closePanel();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [panel, closePanel]);
+  }, [panel, tripOpen, closePanel, closeTrip]);
 
   const unavailableRows = snapshot ? snapshot.sourceCount - snapshot.mappedCount : 0;
   const canList = Boolean(snapshot);
@@ -203,7 +230,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
       basemap === "satellite" && notices.imageryError ? t.imageryError : null;
 
   return (
-    <div className={`app-shell theme-${basemap}`}>
+    <div className={`app-shell theme-${basemap}${trip ? " trip-result-visible" : ""}`}>
       <a className="skip" href="#workspace">{t.skip}</a>
       <header className="toolbar">
         <button type="button" className="brand" onClick={() => map?.reset()} aria-label={`Street Aware — ${t.reset}`}>
@@ -234,7 +261,8 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
 
       <main ref={workspace} id="workspace" tabIndex={-1} className="workspace" data-points-ready={pointsReady}>
         <MapCanvas imageryKey={imageryKey} streetsStyle={streetsStyle} basemap={basemap} view={view} language={language} label={t.map}
-          snapshotId={snapshot?.id ?? null} selected={selected} selectedArea={selectedArea} onReady={setMap}
+          snapshotId={snapshot?.id ?? null} selected={selected} selectedArea={selectedArea}
+          trip={trip} inspectCrashes={!tripOpen} onReady={setMap}
           onUnavailable={() => setUnavailable(true)} onImagery={setImagery}
           onPointsReady={setPointsReady}
           onNotice={onNotice} onCrash={openCrash} onHotspot={(bounds) => openList("hotspot", bounds)}
@@ -281,8 +309,8 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
           <div role="status">{activeNotice && <p className="map-notice">{activeNotice}</p>}</div>
         )}
 
-        <Legend view={view} language={language} listEnabled={canList}
-          onList={() => openList(map ? "view" : "country", map?.bounds() ?? null)} />
+        {!trip && <Legend view={view} language={language} listEnabled={canList}
+          onList={() => openList(map ? "view" : "country", map?.bounds() ?? null)} />}
 
         {map && (
           <div className="map-navigation">
@@ -300,7 +328,14 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
             onBack={(list) => { setSelected(null); setPanel(list); }}
             onLocate={map ? locateCrash : null} onZoomArea={map ? zoomToArea : null} />
         )}
+        {tripOpen && <TripPlanner language={language} result={trip} onResult={setTrip} onClose={closeTrip} />}
       </main>
+      <div className="trip-dock">
+        <button ref={tripButton} type="button" className="trip-primary" aria-expanded={tripOpen}
+          aria-controls={tripOpen ? "trip-planner" : undefined} onClick={toggleTrip}>
+          <Route size={18} aria-hidden="true" />{tripCopy[language].button}
+        </button>
+      </div>
       <Attribution basemap={basemap} imagery={imagery} language={language} />
     </div>
   );
