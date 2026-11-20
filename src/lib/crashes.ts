@@ -33,6 +33,7 @@ export interface Crash {
 export interface CrashPage {
   crashes: Crash[];
   next: number | null;
+  total?: number;
 }
 
 export type CrashPoints = FeatureCollection<Point, { severity: Severity; crashId: number }>;

@@ -1,6 +1,6 @@
 import { isSnapshotId, parseBounds, parseRowId } from "@/lib/crashes";
 import { databaseUnavailable, problem } from "@/lib/http";
-import { listCrashes } from "@/lib/queries";
+import { countCrashesInBounds, listCrashes } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +15,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ snap
   if (after === null || (boundsQuery !== null && bounds === null)) return problem(400, "Invalid list parameters.");
 
   try {
-    return Response.json(await listCrashes(snapshot, after, bounds));
+    const [page, total] = await Promise.all([
+      listCrashes(snapshot, after, bounds),
+      bounds && cursor === null && query.get("includeTotal") === "1"
+        ? countCrashesInBounds(snapshot, bounds) : undefined,
+    ]);
+    return Response.json({ ...page, total });
   } catch (error) {
     return databaseUnavailable(error);
   }

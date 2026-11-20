@@ -29,5 +29,18 @@ test("the running demo delivers the active snapshot and a browser-decodable map 
     const detail = await fetch(new URL(snapshotUrl + "/crashes/" + crashes[0].id, base));
     assert.equal(detail.status, 200);
     assert.deepEqual(await detail.json(), crashes[0]);
+
+    const { longitude, latitude } = crashes[0];
+    const [left, bottom, right, top] = [longitude - 0.06, latitude - 0.06, longitude + 0.06, latitude + 0.06];
+    const inArea = points.features.filter(({ geometry: { coordinates: [x, y] } }) =>
+      x >= left && x <= right && y >= bottom && y <= top);
+    const areaUrl = new URL(snapshotUrl + "/crashes", base);
+    areaUrl.searchParams.set("bounds", [left, bottom, right, top].join(","));
+    areaUrl.searchParams.set("includeTotal", "1");
+    const area = await fetch(areaUrl);
+    assert.equal(area.status, 200);
+    const areaPage = await area.json() as CrashPage;
+    assert.equal(areaPage.total, inArea.length);
+    assert.deepEqual(areaPage.crashes.map(({ id }) => id), inArea.slice(0, 30).map(({ id }) => id));
   }
 });

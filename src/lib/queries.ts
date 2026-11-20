@@ -35,6 +35,14 @@ export async function getCrash(snapshotId: string, id: number) {
   return rows[0] ?? null;
 }
 
+export async function countCrashesInBounds(snapshotId: string, bounds: Bounds) {
+  const { rows: [result] } = await database().query<{ total: number }>(`
+    SELECT count(*)::integer AS total FROM crashes
+    WHERE snapshot_id = $1 AND geom IS NOT NULL AND geom && ST_MakeEnvelope($2, $3, $4, $5, 4326)`,
+  [snapshotId, ...bounds]);
+  return result.total;
+}
+
 const pageSize = 30;
 
 export async function listCrashes(snapshotId: string, after: number, bounds: Bounds | null): Promise<CrashPage> {
