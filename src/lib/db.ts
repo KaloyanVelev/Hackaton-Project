@@ -3,7 +3,7 @@ import pg from "pg";
 const shared = globalThis as typeof globalThis & { streetAwarePool?: pg.Pool };
 
 export function database() {
-  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required.");
+  if (!process.env.DATABASE_URL && !process.env.PGHOST) throw new Error("DATABASE_URL or PGHOST is required.");
   shared.streetAwarePool ??= new pg.Pool({
     connectionString: process.env.DATABASE_URL,
     max: 8,

@@ -2,6 +2,10 @@
 
 Street Aware is a bilingual map of recorded road crashes in Bulgaria. The local demo starts in the Bulgarian Hotspots view. Select a colored area to open its crash list, or switch to Crashes for severity markers.
 
+## Deploy on Coolify
+
+Follow the [Coolify deployment guide](DEPLOY_COOLIFY.md). The Compose stack restores the bundled crash snapshot on first start.
+
 ## Run the demo
 
 Follow the [Docker handoff guide](HOW_TO_RUN_DOCKER.md) to restore the included backup at `data/street-aware.dump` and start the app.
