@@ -1,6 +1,7 @@
 # Deploy Street Aware on Coolify
 
 Deploy the repository with Coolify’s **Docker Compose** build strategy. The committed stack builds the app and restores the included crash snapshot on its first start.
+The bundled PostGIS image targets Linux x86-64 (`amd64`).
 
 ## Set up the application
 
