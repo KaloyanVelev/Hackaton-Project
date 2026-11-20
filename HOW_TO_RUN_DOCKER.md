@@ -4,8 +4,7 @@ Use this guide to set up the demo on another machine from the code and the datab
 
 ## What to have ready
 
-- The Street Aware repository or a copy of the desired revision. For the clickable heatmap, use a checkout that includes commit `b88dd4f`.
-- The separately supplied database backup at `data/street-aware.dump`. Share the backup alongside the repository because Git ignores `data/`.
+- A clone of the Street Aware repository on `main`. The clone includes the database backup at `data/street-aware.dump`.
 - Docker with Compose v2 running Linux containers. The first build needs internet access to fetch the base images and dependencies. The Streets and Terrain basemaps use online tile services.
 
 ## Restore the database
@@ -14,7 +13,7 @@ These commands use PowerShell. Use `street-aware-handoff` as the Compose project
 
 ```powershell
 if (-not (Test-Path -LiteralPath './data/street-aware.dump' -PathType Leaf)) {
-  throw 'Place the supplied database backup at data/street-aware.dump.'
+  throw 'The database backup is missing. Check that you are in the repository root and have the current main branch.'
 }
 
 docker compose -p street-aware-handoff up -d --wait db

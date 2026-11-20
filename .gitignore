@@ -11,5 +11,6 @@ next-env.d.ts
 .local/
 test-results/
 *.docx
-/data/
+/data/*
+!/data/street-aware.dump
 /public/maps/maplibre-gl-worker.mjs

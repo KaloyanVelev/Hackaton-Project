@@ -1,3 +1,4 @@
 * text=auto eol=lf
 public/maps/bulgaria.geojson -text
 *.png -text
+data/street-aware.dump binary -eol
