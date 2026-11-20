@@ -39,6 +39,11 @@ export function MapCanvas({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const styleLoadedRef = useRef<boolean>(false);
+  const crashesDataRef = useRef<CrashFeatureCollection | null>(crashesData);
+
+  useEffect(() => {
+    crashesDataRef.current = crashesData;
+  }, [crashesData]);
 
   const getFatalHex = () => {
     if (fatalColor === "amber") return "#F59E0B";
@@ -49,27 +54,28 @@ export function MapCanvas({
   const getHeatmapOpacity = (): any => {
     if (layerMode === "bubbles") return 0;
     if (layerMode === "heatmap" || layerMode === "both") return 0.85;
-    return ["interpolate", ["linear"], ["zoom"], 8.5, 0.85, 10.5, 0];
+    return ["interpolate", ["linear"], ["zoom"], 7, 0.6, 11, 0];
   };
 
   const getCircleOpacity = (): any => {
     if (layerMode === "heatmap") return 0;
-    if (layerMode === "bubbles" || layerMode === "both") return dotOpacity;
-    return ["interpolate", ["linear"], ["zoom"], 8.5, 0, 10.5, dotOpacity];
+    return dotOpacity;
   };
 
   const getCircleStrokeOpacity = (): any => {
     if (layerMode === "heatmap") return 0;
-    if (layerMode === "bubbles" || layerMode === "both") return 0.7;
-    return ["interpolate", ["linear"], ["zoom"], 8.5, 0, 10.5, 0.7];
+    return 0.7;
   };
 
   const setupSourcesAndLayers = (map: MapLibreMap) => {
     if (!map.getSource("crashes-source")) {
       map.addSource("crashes-source", {
         type: "geojson",
-        data: crashesData || { type: "FeatureCollection", features: [] },
+        data: crashesDataRef.current || { type: "FeatureCollection", features: [] },
       });
+    } else if (crashesDataRef.current) {
+      const src = map.getSource("crashes-source") as maplibregl.GeoJSONSource;
+      src.setData(crashesDataRef.current);
     }
 
     if (!map.getSource("hotspots-source")) {
@@ -147,7 +153,8 @@ export function MapCanvas({
             "interpolate",
             ["linear"],
             ["zoom"],
-            7, Math.max(1.5, dotSize * 0.4),
+            4, 2.5,
+            7, Math.max(2.5, dotSize * 0.6),
             11, dotSize,
             15, dotSize * 1.8,
           ],
@@ -228,7 +235,7 @@ export function MapCanvas({
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !styleLoadedRef.current) return;
+    if (!map) return;
 
     const source = map.getSource("crashes-source") as maplibregl.GeoJSONSource | undefined;
     if (source && crashesData) {
@@ -279,7 +286,8 @@ export function MapCanvas({
         "interpolate",
         ["linear"],
         ["zoom"],
-        7, Math.max(1.5, dotSize * 0.4),
+        4, 2.5,
+        7, Math.max(2.5, dotSize * 0.6),
         11, dotSize,
         15, dotSize * 1.8,
       ]);
