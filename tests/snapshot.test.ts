@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { deriveSeverity, parseBounds, parseRowId } from "../src/lib/crashes.ts";
+import { countActiveFilters, deriveSeverity, parseBounds, parseCrashFilters, parseRowId, serializeFilters } from "../src/lib/crashes.ts";
 import { columns, parseSnapshot } from "../scripts/snapshot-input.ts";
 
 test("derives all severity classes and prioritizes known fatalities", () => {
@@ -47,4 +47,46 @@ test("validates list bounds and row IDs", () => {
   assert.equal(parseRowId("102103"), 102103);
   assert.equal(parseRowId("2147483648"), null);
   assert.equal(parseRowId("1e2"), null);
+});
+
+test("parses, counts and serializes valid and invalid crash filters", () => {
+  const empty = parseCrashFilters(new URLSearchParams());
+  assert.deepEqual(empty, {});
+  assert.equal(countActiveFilters(empty), 0);
+
+  const valid = parseCrashFilters(new URLSearchParams({
+    severity: "fatal",
+    timeOfDay: "night",
+    dayOfWeek: "weekend",
+    crashType: "сблъскване между МПС челно",
+    place: "urban",
+    year: "2025",
+  }));
+  assert.deepEqual(valid, {
+    severity: "fatal",
+    timeOfDay: "night",
+    dayOfWeek: "weekend",
+    crashType: "сблъскване между МПС челно",
+    place: "urban",
+    year: 2025,
+  });
+  assert.equal(countActiveFilters(valid), 6);
+
+  const serialized = serializeFilters(valid);
+  assert.equal(serialized.get("severity"), "fatal");
+  assert.equal(serialized.get("timeOfDay"), "night");
+  assert.equal(serialized.get("dayOfWeek"), "weekend");
+  assert.equal(serialized.get("crashType"), "сблъскване между МПС челно");
+  assert.equal(serialized.get("place"), "urban");
+  assert.equal(serialized.get("year"), "2025");
+
+  const invalid = parseCrashFilters(new URLSearchParams({
+    severity: "catastrophic",
+    timeOfDay: "noon",
+    dayOfWeek: "funday",
+    place: "mars",
+    year: "1899",
+  }));
+  assert.deepEqual(invalid, {});
+  assert.equal(countActiveFilters(invalid), 0);
 });

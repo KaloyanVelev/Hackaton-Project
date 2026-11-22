@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronRight, LocateFixed, X, ZoomIn } from "lucide-react";
-import type { Bounds, Crash, CrashPage, Severity } from "@/lib/crashes";
+import { serializeFilters, type Bounds, type Crash, type CrashFilters, type CrashPage, type Severity } from "@/lib/crashes";
 import { copy, count, crashPlace, crashType, localDate, type Language } from "@/lib/language";
 
 export interface ListPanel {
@@ -23,10 +23,11 @@ async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
+function CrashList({ panel, snapshotId, language, filters, onOpen, onZoom }: {
   panel: ListPanel;
   snapshotId: string;
   language: Language;
+  filters?: CrashFilters;
   onOpen: (id: number) => void;
   onZoom: (() => void) | null;
 }) {
@@ -39,6 +40,11 @@ function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
   const [attempt, setAttempt] = useState(0);
   const bounds = panel.bounds?.join(",");
   const isHotspot = panel.area === "hotspot";
+  const filterKey = JSON.stringify(filters ?? {});
+
+  useEffect(() => {
+    setCursor(null);
+  }, [filterKey]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -46,6 +52,10 @@ function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
     if (bounds) query.set("bounds", bounds);
     if (cursor !== null) query.set("after", String(cursor));
     else if (isHotspot) query.set("includeTotal", "1");
+    if (filters) {
+      const filterParams = serializeFilters(filters);
+      filterParams.forEach((val, key) => query.set(key, val));
+    }
     void read<CrashPage>(`/api/snapshots/${snapshotId}/crashes?${query}`, controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
@@ -56,7 +66,7 @@ function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
       })
       .catch(() => { if (!controller.signal.aborted) setStatus("error"); });
     return () => controller.abort();
-  }, [snapshotId, bounds, cursor, attempt, isHotspot]);
+  }, [snapshotId, bounds, cursor, attempt, isHotspot, filterKey]);
 
   return (
     <>
@@ -154,10 +164,11 @@ function CrashDetail({ id, snapshotId, language, canLocate, onLocate, onSelect }
   );
 }
 
-export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBack, onLocate, onSelect, onZoomArea }: {
+export function CrashDrawer({ panel, snapshotId, language, filters, onClose, onOpen, onBack, onLocate, onSelect, onZoomArea }: {
   panel: Panel;
   snapshotId: string;
   language: Language;
+  filters?: CrashFilters;
   onClose: () => void;
   onOpen: (id: number) => void;
   onBack: (list: ListPanel) => void;
@@ -184,7 +195,7 @@ export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBa
       </div>
       <div className="drawer-body" key={key}>
         {panel.kind === "list" ? (
-          <CrashList panel={panel} snapshotId={snapshotId} language={language} onOpen={onOpen}
+          <CrashList panel={panel} snapshotId={snapshotId} language={language} filters={filters} onOpen={onOpen}
             onZoom={area && onZoomArea ? () => onZoomArea(area) : null} />
         ) : (
           <>

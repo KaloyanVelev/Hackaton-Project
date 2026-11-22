@@ -1,4 +1,4 @@
-import { isSnapshotId, parseBounds, parseRowId } from "@/lib/crashes";
+import { isSnapshotId, parseBounds, parseCrashFilters, parseRowId } from "@/lib/crashes";
 import { databaseUnavailable, problem } from "@/lib/http";
 import { countCrashesInBounds, listCrashes } from "@/lib/queries";
 
@@ -13,12 +13,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ snap
   const after = cursor === null ? 0 : parseRowId(cursor);
   const bounds = boundsQuery === null ? null : parseBounds(boundsQuery);
   if (after === null || (boundsQuery !== null && bounds === null)) return problem(400, "Invalid list parameters.");
+  const filters = parseCrashFilters(query);
 
   try {
     const [page, total] = await Promise.all([
-      listCrashes(snapshot, after, bounds),
+      listCrashes(snapshot, after, bounds, filters),
       bounds && cursor === null && query.get("includeTotal") === "1"
-        ? countCrashesInBounds(snapshot, bounds) : undefined,
+        ? countCrashesInBounds(snapshot, bounds, filters) : undefined,
     ]);
     return Response.json({ ...page, total });
   } catch (error) {

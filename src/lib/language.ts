@@ -98,6 +98,24 @@ const bg = {
   legendInjuries: "Ранени",
   urbanPlace: "В населено място",
   ruralPlace: "Извън населено място",
+  filters: "Филтри",
+  filterButton: "Филтриране на произшествията",
+  filterSeverity: "Тежест на ПТП",
+  filterTimeOfDay: "Време от денонощието",
+  filterDayOfWeek: "Ден от седмицата",
+  filterCrashType: "Вид произшествие",
+  filterPlace: "Място",
+  filterYear: "Година",
+  all: "Всички",
+  allTypes: "Всички видове",
+  dayTime: "Ден (06:00 – 18:00)",
+  nightTime: "Нощ (18:00 – 06:00)",
+  weekdays: "Делнични дни (Пон – Пет)",
+  weekend: "Уикенд (Съб – Нед)",
+  urban: "В населено място",
+  rural: "Извън населено място",
+  clearFilters: "Изчисти всички",
+  activeFilters: "активни",
 };
 
 const en: typeof bg = {
@@ -196,6 +214,24 @@ const en: typeof bg = {
   legendInjuries: "Injuries",
   urbanPlace: "In urban areas",
   ruralPlace: "Outside urban areas",
+  filters: "Filters",
+  filterButton: "Filter crashes",
+  filterSeverity: "Severity",
+  filterTimeOfDay: "Time of day",
+  filterDayOfWeek: "Day of week",
+  filterCrashType: "Crash type",
+  filterPlace: "Location",
+  filterYear: "Year",
+  all: "All",
+  allTypes: "All types",
+  dayTime: "Day (06:00 – 18:00)",
+  nightTime: "Night (18:00 – 06:00)",
+  weekdays: "Weekdays (Mon – Fri)",
+  weekend: "Weekend (Sat – Sun)",
+  urban: "Urban (In town)",
+  rural: "Rural (Out of town)",
+  clearFilters: "Clear all",
+  activeFilters: "active",
 };
 
 export const copy = { bg, en };
@@ -228,6 +264,8 @@ const englishTypes: Record<string, string> = {
   "блъскане на лице работещо на пътя": "Road worker struck",
   "блъскане на дете с летни кънки, ролер, шейна": "Child on skates, rollerblades or a sled struck",
 };
+
+export const availableCrashTypes: readonly string[] = Object.keys(englishTypes);
 
 export function crashType(language: Language, value: string | null) {
   if (value === null) return copy[language].missing;

@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { ArrowRight, BarChart3, CalendarDays, Github, Globe2, Info, List, LocateFixed, Map as MapIcon, Minus, Mountain, Plus, Route } from "lucide-react";
-import { type Bounds, type Crash, type Snapshot, severities } from "@/lib/crashes";
+import { type Bounds, type Crash, type CrashFilters, type Snapshot, severities } from "@/lib/crashes";
 import { copy, count, dateRange, type Language } from "@/lib/language";
 import { useLanguage } from "@/lib/use-language";
 import type { Basemap, CrashView, Imagery } from "@/lib/map-style";
 import type { TripResult } from "@/lib/trip";
 import { tripCopy } from "@/lib/trip-copy";
 import { CrashDrawer, SeverityMark, type ListPanel, type Panel } from "./crash-drawer";
+import { CrashFiltersWidget } from "./crash-filters";
 import { MapCanvas, type MapControls, type MapNotice } from "./map-canvas";
 import { StatsDropdown } from "./stats-dropdown";
 import { TripPlanner } from "./trip-planner";
@@ -153,6 +154,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
   const statsBoundary = useRef<HTMLDivElement>(null);
   const statsTrigger = useRef<HTMLButtonElement>(null);
   const closeStats = useCallback(() => setShowStats(false), []);
+  const [filters, setFilters] = useState<CrashFilters>({});
   const offline = useSyncExternalStore(subscribeToConnection, isOffline, serverIsOffline);
   const opener = useRef<HTMLElement | null>(null);
   const tripButton = useRef<HTMLButtonElement>(null);
@@ -316,43 +318,46 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
       <main ref={workspace} id="workspace" tabIndex={-1} className="workspace" data-points-ready={pointsReady}>
         <MapCanvas imageryKey={imageryKey} streetsStyle={streetsStyle} basemap={basemap} view={view} language={language} label={t.map}
           snapshotId={snapshot?.id ?? null} selected={selected} selectedArea={selectedArea}
-          trip={trip} inspectCrashes={!tripOpen} onReady={setMap}
+          trip={trip} inspectCrashes={!tripOpen} filters={filters} onReady={setMap}
           onUnavailable={() => setUnavailable(true)} onImagery={setImagery}
           onPointsReady={setPointsReady}
           onNotice={onNotice} onCrash={openCrash} onHotspot={(bounds) => openList("hotspot", bounds)}
           onOverlap={(bounds) => openList("nearby", bounds)} />
-        <section className="map-intro" aria-labelledby="map-title">
-          <h1 id="map-title">{t.title}</h1>
-          {snapshot && (
-            <>
-              <p className="period"><CalendarDays size={15} aria-hidden="true" />{dateRange(language, snapshot)}</p>
-              <div className="mapped-line">
-                <p><strong>{count(language, snapshot.mappedCount)}</strong> {t.mapCount}</p>
-                <details className="coverage">
-                  <summary aria-label={t.coverage} title={t.coverage}><Info size={17} aria-hidden="true" /></summary>
-                  <div className="coverage-content">
-                    <h2>{t.coverage}</h2>
-                    <dl>
-                      <div><dt>{t.total}</dt><dd>{count(language, snapshot.sourceCount)}</dd></div>
-                      <div><dt>{t.excluded}</dt><dd>{count(language, unavailableRows)}</dd></div>
-                    </dl>
-                  </div>
-                </details>
+        <div className="dashboard-column">
+          <section className="map-intro" aria-labelledby="map-title">
+            <h1 id="map-title">{t.title}</h1>
+            {snapshot && (
+              <>
+                <p className="period"><CalendarDays size={15} aria-hidden="true" />{dateRange(language, snapshot)}</p>
+                <div className="mapped-line">
+                  <p><strong>{count(language, snapshot.mappedCount)}</strong> {t.mapCount}</p>
+                  <details className="coverage">
+                    <summary aria-label={t.coverage} title={t.coverage}><Info size={17} aria-hidden="true" /></summary>
+                    <div className="coverage-content">
+                      <h2>{t.coverage}</h2>
+                      <dl>
+                        <div><dt>{t.total}</dt><dd>{count(language, snapshot.sourceCount)}</dd></div>
+                        <div><dt>{t.excluded}</dt><dd>{count(language, unavailableRows)}</dd></div>
+                      </dl>
+                    </div>
+                  </details>
+                </div>
+              </>
+            )}
+            {load === "loading" && <p className="status-text" role="status">{t.loading}</p>}
+            {load === "error" && (
+              <div className="status-text" role="status">
+                {t.dataError} <button type="button" className="text-button" onClick={() => { setLoad("loading"); setAttempt((n) => n + 1); }}>{t.retry}</button>
               </div>
-            </>
-          )}
-          {load === "loading" && <p className="status-text" role="status">{t.loading}</p>}
-          {load === "error" && (
-            <div className="status-text" role="status">
-              {t.dataError} <button type="button" className="text-button" onClick={() => { setLoad("loading"); setAttempt((n) => n + 1); }}>{t.retry}</button>
-            </div>
-          )}
-          {load === "ready" && !snapshot && <p className="status-text">{t.noSnapshot}</p>}
-          {snapshot?.mappedCount === 0 && <p className="status-text">{t.noMapped}</p>}
-          {snapshot && snapshot.mappedCount > 0 && !pointsReady && !unavailable && !notices.pointsError && (
-            <p className="status-text" role="status">{t.loading}</p>
-          )}
-        </section>
+            )}
+            {load === "ready" && !snapshot && <p className="status-text">{t.noSnapshot}</p>}
+            {snapshot?.mappedCount === 0 && <p className="status-text">{t.noMapped}</p>}
+            {snapshot && snapshot.mappedCount > 0 && !pointsReady && !unavailable && !notices.pointsError && (
+              <p className="status-text" role="status">{t.loading}</p>
+            )}
+          </section>
+          <CrashFiltersWidget language={language} filters={filters} onChange={setFilters} />
+        </div>
 
         {unavailable ? (
           <div className="map-unavailable" role="status">
@@ -377,7 +382,7 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
           </div>
         )}
         {panel && snapshot && (
-          <CrashDrawer panel={panel} snapshotId={snapshot.id} language={language}
+          <CrashDrawer panel={panel} snapshotId={snapshot.id} language={language} filters={filters}
             onClose={closePanel} onOpen={openCrash} onSelect={setSelected}
             onBack={(list) => { setSelected(null); setPanel(list); }}
             onLocate={map ? locateCrash : null} onZoomArea={map ? zoomToArea : null} />

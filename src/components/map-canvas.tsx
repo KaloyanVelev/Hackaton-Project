@@ -3,7 +3,7 @@
 import { useEffect, useRef } from "react";
 import type { FeatureCollection, LineString, Point as GeoPoint, Polygon } from "geojson";
 import { getVersion, Map as LibreMap, ScaleControl, setWorkerUrl, type GeoJSONSource, type MapMouseEvent, type Point } from "maplibre-gl";
-import type { Bounds, Crash, Severity } from "@/lib/crashes";
+import type { Bounds, Crash, CrashFilters, Severity } from "@/lib/crashes";
 import { severities } from "@/lib/crashes";
 import { copy, type Language } from "@/lib/language";
 import type { TripResult } from "@/lib/trip";
@@ -33,6 +33,7 @@ interface MapSettings {
   selectedArea: Bounds | null;
   trip: TripResult | null;
   inspectCrashes: boolean;
+  filters?: CrashFilters;
 }
 
 interface CanvasProps extends MapSettings {
@@ -237,6 +238,19 @@ function connectMap(
         });
       }
       map.getSource<GeoJSONSource>(tripSource)?.setData(features);
+    }
+    if (!previous || previous.filters?.severity !== settings.filters?.severity) {
+      const severityFilter = settings.filters?.severity;
+      const baseFilter: unknown[] = ["!", ["has", "point_count"]];
+      const activeFilter = severityFilter
+        ? ["all", baseFilter, ["==", ["get", "severity"], severityFilter]]
+        : baseFilter;
+      if (map.getLayer(severityLayer)) {
+        map.setFilter(severityLayer, activeFilter as any);
+      }
+      if (map.getLayer(heatmapLayer)) {
+        map.setFilter(heatmapLayer, activeFilter as any);
+      }
     }
     if (!previous || previous.selected !== settings.selected) {
       const selected: FeatureCollection<GeoPoint> = { type: "FeatureCollection", features: [] };
