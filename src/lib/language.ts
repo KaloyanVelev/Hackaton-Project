@@ -98,6 +98,8 @@ const bg = {
   legendInjuries: "Ранени",
   urbanPlace: "В населено място",
   ruralPlace: "Извън населено място",
+  collapseIntro: "Свий панела с информация",
+  expandIntro: "Разгъни панела с информация",
 };
 
 const en: typeof bg = {
@@ -196,6 +198,8 @@ const en: typeof bg = {
   legendInjuries: "Injuries",
   urbanPlace: "In urban areas",
   ruralPlace: "Outside urban areas",
+  collapseIntro: "Collapse information panel",
+  expandIntro: "Expand information panel",
 };
 
 export const copy = { bg, en };
