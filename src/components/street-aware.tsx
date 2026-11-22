@@ -50,8 +50,8 @@ function Attribution({ basemap, imagery, language }: { basemap: Basemap; imagery
         )}
       </div>
       <a className="map-repo-link" href={repositoryUrl} target="_blank" rel="noreferrer">
+        <span>Check Our Repository</span>
         <Github size={15} aria-hidden="true" />
-        Check our repo
       </a>
       <div className="map-credits"
         onPointerEnter={(event) => { if (event.pointerType === "mouse") setHovered(true); }}
