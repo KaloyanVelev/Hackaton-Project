@@ -342,38 +342,33 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
           onPointsReady={setPointsReady}
           onNotice={onNotice} onCrash={openCrash} onHotspot={(bounds) => openList("hotspot", bounds)}
           onOverlap={(bounds) => openList("nearby", bounds)} />
-        {introCollapsed ? (
-          <section className="map-intro is-collapsed" aria-label={t.title}>
+        <section className={introCollapsed ? "map-intro is-collapsed" : "map-intro"} aria-labelledby="map-title">
+          <div className="map-intro-header">
+            <h1 id="map-title">{t.title}</h1>
             <button
               type="button"
-              className="map-intro-pill"
-              onClick={() => toggleIntro(false)}
-              aria-expanded="false"
-              aria-label={`${t.title}: ${snapshot ? count(language, snapshot.mappedCount) : ""} ${t.mapCount}. ${t.expandIntro}`}
-              title={t.expandIntro}
+              className={introCollapsed ? "map-intro-pill" : "intro-collapse-btn"}
+              onClick={() => toggleIntro(!introCollapsed)}
+              aria-expanded={!introCollapsed}
+              aria-controls="map-intro-details"
+              aria-label={introCollapsed ? t.expandIntro : t.collapseIntro}
+              aria-describedby={introCollapsed && snapshot ? "map-intro-pill-count" : undefined}
+              title={introCollapsed ? t.expandIntro : t.collapseIntro}
             >
-              <MapPin size={15} className="intro-pill-icon" aria-hidden="true" />
-              <span className="intro-pill-text">
-                <strong>{snapshot ? count(language, snapshot.mappedCount) : "..."}</strong> {t.mapCount}
-              </span>
-              <ChevronDown size={15} className="intro-pill-chevron" aria-hidden="true" />
-            </button>
-          </section>
-        ) : (
-          <section className="map-intro" aria-labelledby="map-title">
-            <div className="map-intro-header">
-              <h1 id="map-title">{t.title}</h1>
-              <button
-                type="button"
-                className="intro-collapse-btn"
-                onClick={() => toggleIntro(true)}
-                aria-expanded="true"
-                aria-label={t.collapseIntro}
-                title={t.collapseIntro}
-              >
+              {introCollapsed ? (
+                <>
+                  <MapPin size={15} className="intro-pill-icon" aria-hidden="true" />
+                  <span className="intro-pill-text" id="map-intro-pill-count">
+                    <strong>{snapshot ? count(language, snapshot.mappedCount) : "…"}</strong> {t.mapCount}
+                  </span>
+                  <ChevronDown size={15} className="intro-pill-chevron" aria-hidden="true" />
+                </>
+              ) : (
                 <ChevronUp size={18} aria-hidden="true" />
-              </button>
-            </div>
+              )}
+            </button>
+          </div>
+          <div id="map-intro-details" hidden={introCollapsed}>
             {snapshot && (
               <>
                 <p className="period"><CalendarDays size={15} aria-hidden="true" />{dateRange(language, snapshot)}</p>
@@ -403,8 +398,8 @@ export function StreetAware({ imageryKey, streetsStyle }: { imageryKey: string |
             {snapshot && snapshot.mappedCount > 0 && !pointsReady && !unavailable && !notices.pointsError && (
               <p className="status-text" role="status">{t.loading}</p>
             )}
-          </section>
-        )}
+          </div>
+        </section>
 
         {unavailable ? (
           <div className="map-unavailable" role="status">

@@ -400,6 +400,14 @@ a { color: inherit; }
   border-radius: 0;
   box-shadow: none;
 }
+.map-intro.is-collapsed h1 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
 .map-intro-header {
   display: flex;
   align-items: flex-start;
@@ -973,6 +981,11 @@ a { color: inherit; }
   .legend h2 { font-size: 12px; }
   .hotspot-key { min-height: 28px; }
   .hotspot-hint { max-width: none; margin-bottom: 7px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-intro, .intro-collapse-btn, .map-intro-pill, .intro-pill-chevron { transition: none; }
+  .map-intro-pill:hover, .map-intro-pill:hover .intro-pill-chevron { transform: none; }
 }
 
 @media (prefers-reduced-motion: no-preference) {
