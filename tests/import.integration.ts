@@ -5,7 +5,8 @@ import { test } from "node:test";
 import { gunzipSync } from "node:zlib";
 import pg from "pg";
 import type { FeatureCollection, Polygon } from "geojson";
-import type { CrashPoints } from "../src/lib/crashes.ts";
+import type { CrashFilters, CrashPoints } from "../src/lib/crashes.ts";
+import { buildFilterClauses } from "../src/lib/queries.ts";
 import { columns } from "../scripts/snapshot-input.ts";
 import { importSnapshot } from "../scripts/snapshot-import.ts";
 
@@ -72,5 +73,34 @@ test("PostGIS preserves all rows, clips points and replaces snapshots atomically
     await isolated.end();
     await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
     await admin.end();
+  }
+});
+
+test("Postgres filters use the recorded local time and reject malformed fallback metadata", async () => {
+  const connectionString = process.env.DATABASE_URL;
+  assert.ok(connectionString);
+  const pool = new pg.Pool({ connectionString });
+  try {
+    async function matching(filters: CrashFilters) {
+      const { sql, values } = buildFilterClauses(filters);
+      const result = await pool.query<{ id: number }>(`
+        WITH crashes (id, occurred_at, raw) AS (VALUES
+          (1, timestamp '2025-01-04 18:00', '{"dayofweek":"3","hourofday":"12","year":"2024","ptp_place":"в населено място"}'::jsonb),
+          (2, timestamp '2025-01-06 06:00', '{"dayofweek":"6","hourofday":"18","year":"2024","ptp_place":"извън населено място"}'::jsonb),
+          (3, NULL, '{"dayofweek":"7","hourofday":" 05 ","year":"2024"}'::jsonb),
+          (4, NULL, '{"dayofweek":"1","hourofday":"17","year":"2024"}'::jsonb),
+          (5, NULL, '{"dayofweek":"invalid","hourofday":" 99999999999999 ","year":"unknown"}'::jsonb)
+        ) SELECT id FROM crashes WHERE true ${sql} ORDER BY id`, values);
+      return result.rows.map(({ id }) => id);
+    }
+    assert.deepEqual(await matching({ dayOfWeek: "weekday" }), [2, 4]);
+    assert.deepEqual(await matching({ dayOfWeek: "weekend" }), [1, 3]);
+    assert.deepEqual(await matching({ timeOfDay: "day" }), [2, 4]);
+    assert.deepEqual(await matching({ timeOfDay: "night" }), [1, 3]);
+    assert.deepEqual(await matching({ year: 2024 }), [3, 4]);
+    assert.deepEqual(await matching({ year: 2025, place: "urban", dayOfWeek: "weekend" }), [1]);
+    assert.deepEqual(await matching({ year: 2025, place: "rural", dayOfWeek: "weekday" }), [2]);
+  } finally {
+    await pool.end();
   }
 });

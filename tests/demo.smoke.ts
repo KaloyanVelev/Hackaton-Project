@@ -44,3 +44,50 @@ test("the running demo delivers the active snapshot and a browser-decodable map 
     assert.deepEqual(areaPage.crashes.map(({ id }) => id), inArea.slice(0, 30).map(({ id }) => id));
   }
 });
+
+test("the filtered map feed and paginated crash list return the same mapped crashes", async () => {
+  const meta = await fetch(new URL("/api/snapshot", base));
+  assert.equal(meta.status, 200);
+  const { snapshot } = await meta.json() as { snapshot: Snapshot | null };
+  assert.ok(snapshot);
+  const snapshotUrl = `/api/snapshots/${snapshot.id}`;
+  const filterQueries = [
+    "dayOfWeek=weekday", "dayOfWeek=weekend", "timeOfDay=night", "severity=fatal", "place=rural",
+    "dayOfWeek=weekend&timeOfDay=night&severity=fatal&place=rural", "crashType=no-such-crash-type",
+    new URLSearchParams({ crashType: "блъскане на пешеходец" }).toString(),
+  ];
+  if (snapshot.firstAt) filterQueries.push(`year=${snapshot.firstAt.slice(0, 4)}`);
+  const days = new Map<string, Set<number | string | undefined>>();
+
+  for (const query of filterQueries) {
+    const listParams = new URLSearchParams(query);
+    listParams.set("bounds", "-180,-90,180,90");
+    listParams.set("includeTotal", "1");
+    const [response, list] = await Promise.all([
+      fetch(new URL(`${snapshotUrl}/points.geojson?${query}`, base)),
+      fetch(new URL(`${snapshotUrl}/crashes?${listParams}`, base)),
+    ]);
+    assert.equal(response.status, 200, query);
+    assert.equal(list.status, 200, query);
+    const { features } = await response.json() as CrashPoints;
+    const page = await list.json() as CrashPage;
+    assert.equal(page.total, features.length, query);
+    assert.deepEqual(page.crashes.map(({ id }) => id), features.slice(0, 30).map(({ id }) => id), query);
+    if (page.next !== null) {
+      listParams.set("after", String(page.next));
+      const more = await fetch(new URL(`${snapshotUrl}/crashes?${listParams}`, base));
+      assert.equal(more.status, 200, query);
+      const nextPage = await more.json() as CrashPage;
+      assert.deepEqual(nextPage.crashes.map(({ id }) => id), features.slice(30, 60).map(({ id }) => id), query);
+    }
+    if (query === "dayOfWeek=weekday" || query === "dayOfWeek=weekend") {
+      days.set(query, new Set(features.map(({ id }) => id)));
+    }
+    if (query === "severity=fatal") assert.ok(features.every(({ properties }) => properties.severity === "fatal"));
+    if (query === "crashType=no-such-crash-type") assert.equal(features.length, 0);
+  }
+
+  const weekdays = days.get("dayOfWeek=weekday")!;
+  const weekends = days.get("dayOfWeek=weekend")!;
+  assert.ok([...weekends].every((id) => !weekdays.has(id)), "A crash cannot happen on both a weekday and a weekend.");
+});
