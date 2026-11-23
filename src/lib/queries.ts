@@ -1,4 +1,4 @@
-import type { AggregatedStats, Bounds, Crash, CrashPage, Snapshot } from "./crashes.ts";
+import { toCrashPoints, type AggregatedStats, type Bounds, type Crash, type CrashFilters, type CrashPage, type CrashPointRow, type Snapshot } from "./crashes.ts";
 import { database } from "./db.ts";
 
 const snapshotFields = `
@@ -12,6 +12,61 @@ const crashFields = `
   row_no AS id, severity, injured, deaths, region, municipality, location,
   crash_type AS "crashType", to_char(occurred_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS "occurredAt",
   ST_X(geom) AS longitude, ST_Y(geom) AS latitude`;
+
+// The recorded timestamp takes precedence. Validate the raw fallback before casting it.
+const recordedYear = `COALESCE(EXTRACT(YEAR FROM occurred_at), CASE
+  WHEN btrim(raw->>'year') ~ '^[0-9]{4}$' THEN btrim(raw->>'year')::int END)`;
+const recordedHour = `COALESCE(EXTRACT(HOUR FROM occurred_at), CASE
+  WHEN btrim(raw->>'hourofday') ~ '^([01]?[0-9]|2[0-3])$' THEN btrim(raw->>'hourofday')::int END)`;
+const recordedDay = `COALESCE(EXTRACT(ISODOW FROM occurred_at), CASE
+  WHEN btrim(raw->>'dayofweek') ~ '^[1-7]$' THEN btrim(raw->>'dayofweek')::int END)`;
+
+export function buildFilterClauses(filters?: CrashFilters | null, startIndex = 1) {
+  if (!filters) return { sql: "", values: [], nextIndex: startIndex };
+
+  const clauses: string[] = [];
+  const values: unknown[] = [];
+  let index = startIndex;
+
+  if (filters.severity) {
+    clauses.push(`severity = $${index++}`);
+    values.push(filters.severity);
+  }
+
+  if (filters.crashType) {
+    clauses.push(`crash_type = $${index++}`);
+    values.push(filters.crashType);
+  }
+
+  if (filters.year) {
+    clauses.push(`${recordedYear} = $${index++}`);
+    values.push(filters.year);
+  }
+
+  if (filters.timeOfDay === "day") {
+    clauses.push(`${recordedHour} BETWEEN 6 AND 17`);
+  } else if (filters.timeOfDay === "night") {
+    clauses.push(`${recordedHour} NOT BETWEEN 6 AND 17`);
+  }
+
+  if (filters.dayOfWeek === "weekday") {
+    clauses.push(`${recordedDay} BETWEEN 1 AND 5`);
+  } else if (filters.dayOfWeek === "weekend") {
+    clauses.push(`${recordedDay} IN (6, 7)`);
+  }
+
+  if (filters.place === "urban") {
+    clauses.push(`lower(btrim(raw->>'ptp_place')) = 'в населено място'`);
+  } else if (filters.place === "rural") {
+    clauses.push(`lower(btrim(raw->>'ptp_place')) = 'извън населено място'`);
+  }
+
+  return {
+    sql: clauses.length > 0 ? " AND " + clauses.join(" AND ") : "",
+    values,
+    nextIndex: index,
+  };
+}
 
 export async function getCurrentSnapshot() {
   const { rows } = await database().query<Snapshot>(`
@@ -33,6 +88,15 @@ export async function getPointFeed(snapshotId: string) {
   return rows[0]?.points_gzip ?? null;
 }
 
+export async function getFilteredCrashPoints(snapshotId: string, filters: CrashFilters) {
+  const { sql, values } = buildFilterClauses(filters, 2);
+  const { rows } = await database().query<CrashPointRow>(`
+    SELECT row_no AS id, ST_X(geom) AS longitude, ST_Y(geom) AS latitude, severity
+    FROM crashes WHERE snapshot_id = $1 AND geom IS NOT NULL ${sql} ORDER BY row_no`,
+  [snapshotId, ...values]);
+  return toCrashPoints(rows);
+}
+
 export async function getCrash(snapshotId: string, id: number) {
   const { rows } = await database().query<Crash>(`
     SELECT ${crashFields} FROM crashes
@@ -40,23 +104,38 @@ export async function getCrash(snapshotId: string, id: number) {
   return rows[0] ?? null;
 }
 
-export async function countCrashesInBounds(snapshotId: string, bounds: Bounds) {
+export async function countCrashesInBounds(snapshotId: string, bounds: Bounds, filters?: CrashFilters | null) {
+  const filterPart = buildFilterClauses(filters, 6);
   const { rows: [result] } = await database().query<{ total: number }>(`
     SELECT count(*)::integer AS total FROM crashes
-    WHERE snapshot_id = $1 AND geom IS NOT NULL AND geom && ST_MakeEnvelope($2, $3, $4, $5, 4326)`,
-  [snapshotId, ...bounds]);
-  return result.total;
+    WHERE snapshot_id = $1 AND geom IS NOT NULL AND geom && ST_MakeEnvelope($2, $3, $4, $5, 4326) ${filterPart.sql}`,
+  [snapshotId, ...bounds, ...filterPart.values]);
+  return result?.total ?? 0;
 }
 
 const pageSize = 30;
 
-export async function listCrashes(snapshotId: string, after: number, bounds: Bounds | null): Promise<CrashPage> {
-  const args = [snapshotId, after, pageSize + 1];
-  const inBounds = bounds ? "AND geom && ST_MakeEnvelope($4, $5, $6, $7, 4326)" : "";
+export async function listCrashes(
+  snapshotId: string,
+  after: number,
+  bounds: Bounds | null,
+  filters?: CrashFilters | null,
+): Promise<CrashPage> {
+  const baseArgs: unknown[] = [snapshotId, after, pageSize + 1];
+  let filterStartIndex = 4;
+  let inBounds = "";
+  if (bounds) {
+    inBounds = `AND geom && ST_MakeEnvelope($${filterStartIndex}, $${filterStartIndex + 1}, $${filterStartIndex + 2}, $${filterStartIndex + 3}, 4326)`;
+    baseArgs.push(...bounds);
+    filterStartIndex += 4;
+  }
+  const filterPart = buildFilterClauses(filters, filterStartIndex);
+  const finalArgs = [...baseArgs, ...filterPart.values];
+
   const { rows } = await database().query<Crash>(`
     SELECT ${crashFields} FROM crashes
-    WHERE snapshot_id = $1 AND row_no > $2 AND geom IS NOT NULL ${inBounds}
-    ORDER BY row_no LIMIT $3`, bounds ? [...args, ...bounds] : args);
+    WHERE snapshot_id = $1 AND row_no > $2 AND geom IS NOT NULL ${inBounds} ${filterPart.sql}
+    ORDER BY row_no LIMIT $3`, finalArgs);
 
   const crashes = rows.slice(0, pageSize);
   return { crashes, next: rows.length > pageSize ? crashes[pageSize - 1].id : null };

@@ -23,10 +23,11 @@ async function read<T>(path: string, signal: AbortSignal): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
+function CrashList({ panel, snapshotId, language, filterQuery, onOpen, onZoom }: {
   panel: ListPanel;
   snapshotId: string;
   language: Language;
+  filterQuery: string;
   onOpen: (id: number) => void;
   onZoom: (() => void) | null;
 }) {
@@ -42,7 +43,7 @@ function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
 
   useEffect(() => {
     const controller = new AbortController();
-    const query = new URLSearchParams();
+    const query = new URLSearchParams(filterQuery);
     if (bounds) query.set("bounds", bounds);
     if (cursor !== null) query.set("after", String(cursor));
     else if (isHotspot) query.set("includeTotal", "1");
@@ -56,7 +57,7 @@ function CrashList({ panel, snapshotId, language, onOpen, onZoom }: {
       })
       .catch(() => { if (!controller.signal.aborted) setStatus("error"); });
     return () => controller.abort();
-  }, [snapshotId, bounds, cursor, attempt, isHotspot]);
+  }, [snapshotId, bounds, cursor, attempt, isHotspot, filterQuery]);
 
   return (
     <>
@@ -154,10 +155,11 @@ function CrashDetail({ id, snapshotId, language, canLocate, onLocate, onSelect }
   );
 }
 
-export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBack, onLocate, onSelect, onZoomArea }: {
+export function CrashDrawer({ panel, snapshotId, language, filterQuery, onClose, onOpen, onBack, onLocate, onSelect, onZoomArea }: {
   panel: Panel;
   snapshotId: string;
   language: Language;
+  filterQuery: string;
   onClose: () => void;
   onOpen: (id: number) => void;
   onBack: (list: ListPanel) => void;
@@ -184,7 +186,7 @@ export function CrashDrawer({ panel, snapshotId, language, onClose, onOpen, onBa
       </div>
       <div className="drawer-body" key={key}>
         {panel.kind === "list" ? (
-          <CrashList panel={panel} snapshotId={snapshotId} language={language} onOpen={onOpen}
+          <CrashList key={`${snapshotId}:${filterQuery}`} panel={panel} snapshotId={snapshotId} language={language} filterQuery={filterQuery} onOpen={onOpen}
             onZoom={area && onZoomArea ? () => onZoomArea(area) : null} />
         ) : (
           <>

@@ -33,6 +33,7 @@ interface MapSettings {
   selectedArea: Bounds | null;
   trip: TripResult | null;
   inspectCrashes: boolean;
+  filterQuery: string;
 }
 
 interface CanvasProps extends MapSettings {
@@ -43,7 +44,7 @@ interface CanvasProps extends MapSettings {
   onUnavailable: () => void;
   onImagery: (imagery: Imagery | null) => void;
   onNotice: (notice: MapNotice, show: boolean) => void;
-  onPointsReady: (ready: boolean) => void;
+  onPointCount: (count: number | null) => void;
   onCrash: (id: number) => void;
   onHotspot: (bounds: Bounds) => void;
   onOverlap: (bounds: Bounds) => void;
@@ -99,6 +100,8 @@ function connectMap(
   let streetLayers: string[] = [];
   let previous: MapSettings | null = null;
   let pendingPoints = false;
+  let pointsReady = false;
+  let pointRevision = 0;
   let timer: number | undefined;
 
   function reset() {
@@ -116,6 +119,15 @@ function connectMap(
 
   function setLayer(id: string, visible: boolean) {
     if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", visible ? "visible" : "none");
+  }
+
+  function showCrashLayers({ view, trip }: MapSettings) {
+    const hotspots = view === "hotspots";
+    const visible = pointsReady && !trip;
+    setLayer(heatmapLayer, visible && hotspots);
+    setLayer(clusterCircleLayer, visible && !hotspots);
+    setLayer("cluster-count", visible && !hotspots);
+    setLayer(severityLayer, visible && !hotspots);
   }
 
   function activeImagery() {
@@ -165,11 +177,7 @@ function connectMap(
     }
     if (!previous || previous.view !== settings.view || Boolean(previous.trip) !== Boolean(settings.trip)) {
       const hotspots = settings.view === "hotspots";
-      const showCrashData = !settings.trip;
-      setLayer(heatmapLayer, hotspots && showCrashData);
-      setLayer(clusterCircleLayer, !hotspots && showCrashData);
-      setLayer("cluster-count", !hotspots && showCrashData);
-      setLayer(severityLayer, !hotspots && showCrashData);
+      showCrashLayers(settings);
       const points = map.getSource<GeoJSONSource>(pointSource);
       if (points && Boolean(points.getClusterOptions().cluster) !== !hotspots) {
         void points.setClusterOptions({ cluster: !hotspots });
@@ -191,12 +199,16 @@ function connectMap(
         canvas.removeAttribute("aria-description");
       }
     }
-    if (!previous || previous.snapshotId !== settings.snapshotId) {
+    if (!previous || previous.snapshotId !== settings.snapshotId || previous.filterQuery !== settings.filterQuery) {
+      pointRevision += 1;
       pendingPoints = Boolean(settings.snapshotId);
-      current.current.onPointsReady(false);
+      pointsReady = false;
+      showCrashLayers(settings);
+      current.current.onPointCount(null);
       current.current.onNotice("pointsError", false);
-      const data = settings.snapshotId ? `/api/snapshots/${settings.snapshotId}/points.geojson` : emptyPoints;
-      map.getSource<GeoJSONSource>(pointSource)?.setData(data);
+      const query = settings.filterQuery ? `?${settings.filterQuery}` : "";
+      const data = settings.snapshotId ? `/api/snapshots/${settings.snapshotId}/points.geojson${query}` : emptyPoints;
+      void map.getSource<GeoJSONSource>(pointSource)?.setData(data);
     }
     if (!previous || previous.selectedArea !== settings.selectedArea) {
       const area: FeatureCollection<Polygon> = { type: "FeatureCollection", features: [] };
@@ -261,6 +273,9 @@ function connectMap(
     }
     if (id === pointSource) {
       pendingPoints = false;
+      pointsReady = false;
+      showCrashLayers(current.current);
+      current.current.onPointCount(null);
       current.current.onNotice("pointsError", true);
     }
 
@@ -276,7 +291,14 @@ function connectMap(
     container.setAttribute("aria-busy", "false");
     if (pendingPoints && map.isSourceLoaded(pointSource)) {
       pendingPoints = false;
-      current.current.onPointsReady(true);
+      pointsReady = true;
+      showCrashLayers(current.current);
+      const revision = pointRevision;
+      void map.getSource<GeoJSONSource>(pointSource)?.getData().then((data) => {
+        if (isReady && pointsReady && revision === pointRevision && data.type === "FeatureCollection") {
+          current.current.onPointCount(data.features.length);
+        }
+      });
     }
   });
 
@@ -350,7 +372,7 @@ function connectMap(
     }
     const cursor = current.current.view === "hotspots"
       ? (current.current.snapshotId && canSelectArea(event.point) ? "crosshair" : "")
-      : (map.queryRenderedFeatures(event.point, { layers: crashHitLayers }).length ? "pointer" : "");
+      : (pointsReady && map.queryRenderedFeatures(event.point, { layers: crashHitLayers }).length ? "pointer" : "");
     map.getCanvas().style.cursor = cursor;
   });
 
@@ -360,14 +382,17 @@ function connectMap(
       if (canSelectArea(event.point)) selectArea(event.point);
       return;
     }
+    if (!pointsReady) return;
     const { x, y } = event.point;
     const features = map.queryRenderedFeatures([[x - 6, y - 6], [x + 6, y + 6]], { layers: crashHitLayers });
     const cluster = features.find((feature) => feature.properties.cluster);
     if (cluster?.geometry.type === "Point") {
       const source = map.getSource<GeoJSONSource>(pointSource);
+      const revision = pointRevision;
       try {
         const zoom = await source?.getClusterExpansionZoom(cluster.properties.cluster_id);
-        if (zoom !== undefined && isReady && current.current.view === "crashes") {
+        if (zoom !== undefined && isReady && pointsReady && current.current.view === "crashes" &&
+            revision === pointRevision) {
           map.easeTo({
             center: cluster.geometry.coordinates.slice(0, 2) as [number, number],
             zoom, duration: prefersStill() ? 0 : 480,

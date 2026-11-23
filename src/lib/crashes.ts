@@ -125,6 +125,20 @@ export function crashLocationCounts(rows: UrbanRuralStat[]) {
 
 export type CrashPoints = FeatureCollection<Point, { severity: Severity; crashId: number }>;
 
+export type CrashPointRow = Pick<Crash, "id" | "longitude" | "latitude" | "severity">;
+
+export function toCrashPoints(rows: readonly CrashPointRow[]): CrashPoints {
+  return {
+    type: "FeatureCollection",
+    features: rows.map(({ id, longitude, latitude, severity }) => ({
+      type: "Feature",
+      id,
+      geometry: { type: "Point", coordinates: [longitude, latitude] },
+      properties: { crashId: id, severity },
+    })),
+  };
+}
+
 export function deriveSeverity(deaths: number | null, injured: number | null): Severity {
   if (deaths !== null && deaths > 0) return "fatal";
   if (deaths === 0 && injured !== null) return injured > 0 ? "injury" : "none";
@@ -150,4 +164,83 @@ export function parseBounds(value: string): Bounds | null {
     return null;
   }
   return [west, south, east, north];
+}
+
+export const timeOfDayOptions = ["day", "night"] as const;
+export type TimeOfDay = (typeof timeOfDayOptions)[number];
+
+export const dayOfWeekOptions = ["weekday", "weekend"] as const;
+export type DayOfWeek = (typeof dayOfWeekOptions)[number];
+
+export const placeOptions = ["urban", "rural"] as const;
+export type PlaceFilter = (typeof placeOptions)[number];
+
+export interface CrashFilters {
+  severity?: Severity | null;
+  timeOfDay?: TimeOfDay | null;
+  dayOfWeek?: DayOfWeek | null;
+  crashType?: string | null;
+  place?: PlaceFilter | null;
+  year?: number | null;
+}
+
+export function parseCrashFilters(params: URLSearchParams): CrashFilters {
+  const filters: CrashFilters = {};
+
+  const severityParam = params.get("severity");
+  if (severityParam && (severities as readonly string[]).includes(severityParam)) {
+    filters.severity = severityParam as Severity;
+  }
+
+  const timeOfDayParam = params.get("timeOfDay");
+  if (timeOfDayParam && (timeOfDayOptions as readonly string[]).includes(timeOfDayParam)) {
+    filters.timeOfDay = timeOfDayParam as TimeOfDay;
+  }
+
+  const dayOfWeekParam = params.get("dayOfWeek");
+  if (dayOfWeekParam && (dayOfWeekOptions as readonly string[]).includes(dayOfWeekParam)) {
+    filters.dayOfWeek = dayOfWeekParam as DayOfWeek;
+  }
+
+  const crashTypeParam = params.get("crashType")?.trim();
+  if (crashTypeParam && crashTypeParam.length <= 150) {
+    filters.crashType = crashTypeParam;
+  }
+
+  const placeParam = params.get("place");
+  if (placeParam && (placeOptions as readonly string[]).includes(placeParam)) {
+    filters.place = placeParam as PlaceFilter;
+  }
+
+  const yearParam = params.get("year");
+  if (yearParam && /^\d{4}$/.test(yearParam)) {
+    const yr = Number(yearParam);
+    if (yr >= 2000 && yr <= 2100) {
+      filters.year = yr;
+    }
+  }
+
+  return filters;
+}
+
+export function countActiveFilters(filters: CrashFilters): number {
+  return [
+    filters.severity,
+    filters.timeOfDay,
+    filters.dayOfWeek,
+    filters.crashType,
+    filters.place,
+    filters.year,
+  ].filter((value) => value !== undefined && value !== null).length;
+}
+
+export function serializeFilters(filters: CrashFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.severity) params.set("severity", filters.severity);
+  if (filters.timeOfDay) params.set("timeOfDay", filters.timeOfDay);
+  if (filters.dayOfWeek) params.set("dayOfWeek", filters.dayOfWeek);
+  if (filters.crashType) params.set("crashType", filters.crashType);
+  if (filters.place) params.set("place", filters.place);
+  if (filters.year) params.set("year", String(filters.year));
+  return params;
 }

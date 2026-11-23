@@ -1,15 +1,24 @@
 import { gunzipSync } from "node:zlib";
-import { isSnapshotId } from "@/lib/crashes";
+import { countActiveFilters, isSnapshotId, parseCrashFilters } from "@/lib/crashes";
 import { databaseUnavailable, problem } from "@/lib/http";
-import { getPointFeed } from "@/lib/queries";
+import { getFilteredCrashPoints, getPointFeed, hasSnapshot } from "@/lib/queries";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(_request: Request, { params }: { params: Promise<{ snapshot: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ snapshot: string }> }) {
   const { snapshot } = await params;
   if (!isSnapshotId(snapshot)) return problem(404, "Snapshot not found.");
 
   try {
+    const filters = parseCrashFilters(new URL(request.url).searchParams);
+    if (countActiveFilters(filters) > 0) {
+      if (!await hasSnapshot(snapshot)) return problem(404, "Snapshot not found.");
+      const points = await getFilteredCrashPoints(snapshot, filters);
+      return new Response(JSON.stringify(points), { headers: {
+        "Content-Type": "application/geo+json",
+        "Cache-Control": "no-store",
+      } });
+    }
     const data = await getPointFeed(snapshot);
     if (!data) return problem(404, "Snapshot not found.");
     const headers = new Headers({

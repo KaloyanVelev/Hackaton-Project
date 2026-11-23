@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { gzipSync } from "node:zlib";
 import type { MultiPolygon, Polygon } from "geojson";
 import type { Pool, PoolClient } from "pg";
-import type { CrashPoints, Severity } from "../src/lib/crashes.ts";
+import { toCrashPoints, type CrashPointRow } from "../src/lib/crashes.ts";
 import { parseSnapshot } from "./snapshot-input.ts";
 
 const classifyRows = `
@@ -66,19 +66,10 @@ export async function importSnapshot(pool: Pool, bytes: Buffer, boundary: Polygo
       await client.query(classifyRows, [id, JSON.stringify(rows.slice(start, start + batchSize)), geometry]);
     }
 
-    const points = await client.query<{ id: number; longitude: number; latitude: number; severity: Severity }>(`
+    const points = await client.query<CrashPointRow>(`
       SELECT row_no AS id, ST_X(geom) AS longitude, ST_Y(geom) AS latitude, severity
       FROM crashes WHERE snapshot_id = $1 AND geom IS NOT NULL ORDER BY row_no`, [id]);
-    const collection: CrashPoints = {
-      type: "FeatureCollection",
-      features: points.rows.map(({ id: crashId, longitude, latitude, severity }) => ({
-        type: "Feature",
-        id: crashId,
-        geometry: { type: "Point", coordinates: [longitude, latitude] },
-        properties: { crashId, severity },
-      })),
-    };
-    const feed = gzipSync(JSON.stringify(collection));
+    const feed = gzipSync(JSON.stringify(toCrashPoints(points.rows)));
 
     await client.query(`
       WITH totals AS (
