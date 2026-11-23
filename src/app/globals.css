@@ -1149,7 +1149,7 @@ a { color: inherit; }
     left: 0;
     right: 0;
     width: auto;
-    max-height: 65%;
+    max-height: min(65%, calc(100% - 185px));
     min-height: 120px;
     border-radius: 15px 15px 0 0;
   }
